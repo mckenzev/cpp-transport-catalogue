@@ -13,9 +13,13 @@ void InputReader::ParseLine(string_view line) {
 void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue& catalogue) const {
     for (auto& command : commands_) {
         if (command.command == "Stop") {
-            catalogue.AddStop(move(command.id), ParseCoordinates(command.description));
-        } else if (command.command == "Bus") {
-            catalogue.AddBus(move(command.id), ParseRoute(command.description));
+            catalogue.AddStop(command.id, ParseCoordinates(command.description));
+        }
+    }
+
+    for (auto& command : commands_) {
+        if (command.command == "Bus") {
+            catalogue.AddBus(command.id, ParseRoute(command.description));
         }
     }
 }

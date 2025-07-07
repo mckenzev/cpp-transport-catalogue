@@ -1,73 +1,58 @@
 #include "transport_catalogue.h"
 
-#include <unordered_set>
-
 using namespace std;
 using Bus = TransportCatalogue::Bus;
 using Stop = TransportCatalogue::Stop;
 using BusStat = TransportCatalogue::BusStat;
-using StopStat = TransportCatalogue::StopStat;
 
-
-void TransportCatalogue::AddBus(string_view bus_name, vector<string_view> route) {
-    vector<Stop*> final_route;
+void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>& route) {
+    vector<const Stop*> final_route;
     final_route.reserve(route.size());
 
     for (auto name : route) {
-        Stop* stop = FindStop(name);
+        const Stop* stop = FindStop(name);
         final_route.push_back(stop);
     }
     
-    Bus* bus = FindBus(bus_name);
-    bus->stops = move(final_route);
+    Bus bus{string(bus_name), move(final_route)};
+    all_buses_.push_back(move(bus));
 
-    for (auto stop : bus->stops) {
-        stop->buses.insert(bus);
+    Bus* bus_ptr = &all_buses_.back();
+    buses_map_.emplace(bus_ptr->name, bus_ptr);
+
+    for (auto stop : bus_ptr->stops) {
+        stop_to_buses_[stop->name].insert(bus_ptr);
     }
 }
 
 void TransportCatalogue::AddStop(string_view stop_name, Coordinates coord) {
-    auto stop = FindStop(stop_name);
-    stop->coordinates = coord;
+    Stop stop{string(stop_name), coord};
+    all_stops_.push_back(move(stop));
+
+    Stop* stop_ptr = &all_stops_.back();
+    stops_map_.emplace(stop_ptr->name, stop_ptr);
 }
 
-Stop* TransportCatalogue::FindStop(string_view name) {
+const Stop* TransportCatalogue::FindStop(string_view name) const {
     auto it = stops_map_.find(name);
-    if (it != stops_map_.end()) {
-        return it->second; 
-    }
-
-    all_stops_.push_back(Stop{string(name), {}, {}});
-    Stop* new_stop = &all_stops_.back();
-    stops_map_.emplace(new_stop->name, new_stop);
-
-    return new_stop;
+    return it != stops_map_.end() ? it->second : nullptr;
 }
 
-Bus* TransportCatalogue::FindBus(string_view name) {
+const Bus* TransportCatalogue::FindBus(string_view name) const {
     auto it = buses_map_.find(name);
-    if (it != buses_map_.end()) {
-        return it->second;
-    }
-    
-    all_buses_.push_back(Bus{string(name), {}});
-    Bus* new_bus = &all_buses_.back();
-    buses_map_.emplace(new_bus->name, new_bus);
-
-    return new_bus;
-    
+    return it != buses_map_.end() ? it->second : nullptr;
 }
 
-optional<BusStat> TransportCatalogue::BusInfo(string_view bus_id) const {
-    auto bus = buses_map_.find(bus_id);
+optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
+    const Bus* bus = FindBus(bus_id);
     
-    if (bus == buses_map_.end()) {
+    if (bus == nullptr) {
         return nullopt;
     }
 
-    const auto& stops = bus->second->stops;
+    const auto& stops = bus->stops;
 
-    unordered_set<Stop*> uniq_stops;
+    unordered_set<const Stop*> uniq_stops;
     // Размер контейнера точно будет не больше количества остановок, но преждевременная резервация убережет от реаллокаций
     uniq_stops.reserve(stops.size());
     double distance = 0.;
@@ -87,13 +72,20 @@ optional<BusStat> TransportCatalogue::BusInfo(string_view bus_id) const {
     return BusStat{stops.size(), uniq_stops.size(), distance};
 }
 
-optional<StopStat> TransportCatalogue::StopInfo(string_view stop_name) const {
-    auto stop = stops_map_.find(stop_name);
-    if (stop == stops_map_.end()) {
+optional<vector<string_view>> TransportCatalogue::GetStopInfo(string_view stop_name) const {
+    // Если остановка не зарегистрирована, значит ее нет - возвращается nullopt
+    if (FindStop(stop_name) == nullptr) {
         return nullopt;
     }
 
-    const auto& buses = stop->second->buses;
+    // Если остановка зарегистрирована, но не найдены автобусы, проходящие через нее - возвращается пустой массив
+    auto it = stop_to_buses_.find(stop_name);
+    if (it == stop_to_buses_.end()) {
+        return vector<string_view>();
+    }
+
+    // Иначе из массива остановок формируется массив из наименований этих остановок
+    const auto& buses = it->second;
     
     vector<string_view> names;
     names.reserve(buses.size());
@@ -102,5 +94,5 @@ optional<StopStat> TransportCatalogue::StopInfo(string_view stop_name) const {
         names.push_back(bus->name);
     }
 
-    return StopStat{move(names)};
+    return names;
 }
