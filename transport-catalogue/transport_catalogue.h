@@ -33,7 +33,7 @@ public:
 		double distance;			// Длина маршрута
 	};
 
-	using BusesTable = std::unordered_set<Bus*>;
+	using BusesTable = std::unordered_set<const Bus*>;
 
 	void AddBus(string_view bus_name, const std::vector<string_view>& route);
 	void AddStop(string_view stop_name, Coordinates coord);
@@ -51,8 +51,8 @@ private:
 	std::deque<Bus> all_buses_;
 
 	// Ключ мапы ссылается на строку поля name структур `Stop` и `Bus`
-	std::unordered_map<string_view, Stop*> stops_map_;
-	std::unordered_map<string_view, Bus*> buses_map_;
+	std::unordered_map<string_view, const Stop*> stops_map_;
+	std::unordered_map<string_view, const Bus*> buses_map_;
 
 	// Автобусы, проходящие через остановку
 	// Ключ - название остановки, значение - множество автобусов, проходящих через остановку
