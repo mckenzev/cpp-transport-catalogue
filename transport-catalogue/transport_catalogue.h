@@ -44,7 +44,7 @@ public:
 	/**
 	 * Возвращает `nullopt` если остановка не найдена или неотсортированный вектор(в т.ч. пустой) с остановками
 	 */
-	[[nodiscard]] std::optional<std::vector<string_view>> GetStopInfo(string_view stop_name) const;
+	[[nodiscard]] std::optional<const BusesTable> GetStopInfo(string_view stop_name) const;
 
 private:
 	std::deque<Stop> all_stops_;

@@ -4,6 +4,7 @@ using namespace std;
 using Bus = TransportCatalogue::Bus;
 using Stop = TransportCatalogue::Stop;
 using BusStat = TransportCatalogue::BusStat;
+using BusesTable = TransportCatalogue::BusesTable;
 
 void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>& route) {
     vector<const Stop*> final_route;
@@ -72,27 +73,11 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
     return BusStat{stops.size(), uniq_stops.size(), distance};
 }
 
-optional<vector<string_view>> TransportCatalogue::GetStopInfo(string_view stop_name) const {
-    // Если остановка не зарегистрирована, значит ее нет - возвращается nullopt
+optional<const BusesTable> TransportCatalogue::GetStopInfo(string_view stop_name) const {
     if (FindStop(stop_name) == nullptr) {
         return nullopt;
     }
 
-    // Если остановка зарегистрирована, но не найдены автобусы, проходящие через нее - возвращается пустой массив
     auto it = stop_to_buses_.find(stop_name);
-    if (it == stop_to_buses_.end()) {
-        return vector<string_view>();
-    }
-
-    // Иначе из массива остановок формируется массив из наименований этих остановок
-    const auto& buses = it->second;
-    
-    vector<string_view> names;
-    names.reserve(buses.size());
-    
-    for (auto bus : buses) {
-        names.push_back(bus->name);
-    }
-
-    return names;
+    return it == stop_to_buses_.end() ? BusesTable() : it->second;
 }

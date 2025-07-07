@@ -39,18 +39,21 @@ void DisplayBusInfo(const TransportCatalogue& tansport_catalogue, string_view bu
 
 void DisplayStopInfo(const TransportCatalogue& tansport_catalogue, string_view stop_name, ostream& output) {
     PrecisionSetter ps(output, static_cast<size_t>(6));
-    auto result = tansport_catalogue.GetStopInfo(stop_name);
+    auto buses = tansport_catalogue.GetStopInfo(stop_name);
     
-    if (result == nullopt) {
+    if (buses == nullopt) {
         output << "Stop " << stop_name << ": not found" << endl;
-    } else if (result->empty()) {
+    } else if (buses->empty()) {
         output << "Stop " << stop_name << ": no buses" << endl;
     } else {
         // Сортировка, т.к. GetStopInfo возвращает массив без сортировки
-        sort(result->begin(), result->end());
+        vector<string_view> buses_names;
+        buses_names.reserve(buses->size());
+        transform(buses->begin(), buses->end(), back_inserter(buses_names), [](const auto& bus) { return bus->name; });
+        sort(buses_names.begin(), buses_names.end());
         output << "Stop " << stop_name << ": buses";
-        for (auto bus : result.value()) {
-            output << ' ' << bus;
+        for (auto name : buses_names) {
+            output << ' ' << name;
         }
         output << endl;
     }
