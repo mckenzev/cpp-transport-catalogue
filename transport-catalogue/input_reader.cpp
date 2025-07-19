@@ -1,5 +1,9 @@
 #include "input_reader.h"
 
+#include <stdexcept>
+
+#include <iostream> // Удалить
+
 using namespace std;
 using namespace Utils;
 
@@ -13,7 +17,7 @@ void InputReader::ParseLine(string_view line) {
 void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue& catalogue) const {
     for (auto& command : commands_) {
         if (command.command == "Stop") {
-            catalogue.AddStop(command.id, ParseCoordinates(command.description));
+            AddStop(command, catalogue);
         }
     }
 
@@ -24,22 +28,61 @@ void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue& catalogue) 
     }
 }
 
-namespace Utils {
+void InputReader::AddStop(const CommandDescription& command, TransportCatalogue& catalogue) const {
+    // под индексом 0 и 1 окажутся долгота и широта. С индекса 2 - строки формата "D[i]m to Stop[i]"
+    auto tokens = Split(command.description, ',');
+    auto coord = ParseCoordinates(tokens[0], tokens[1]);
+    catalogue.AddStop(command.id, coord);
+    // Индексация расстояний до след. остановок начинается с 2
+    for (size_t i = 2; i < tokens.size(); ++i) {
+        auto [to, distance] = ParseDistanceToStop(tokens[i]);
+        catalogue.AddStopsDistance(command.id, to, distance);
+    }
+}
 
-Coordinates ParseCoordinates(string_view str) {
-    static const double nan = std::nan("");
-
-    size_t not_space = str.find_first_not_of(' ');
-    size_t comma = str.find(',');
-
-    if (comma == str.npos) {
-        return {nan, nan};
+std::pair<std::string_view, int> InputReader::ParseDistanceToStop(std::string_view str) const {
+    // В str строка формата "D[i]m to Stop[i]". Ориентир - 2 пробела
+    // Если где то поиск пробела не увенчался успехом, значит передана строка недопустимого формата
+    size_t distance_end = str.find(' ');
+    if (distance_end > str.size()) {
+        throw runtime_error("Invalid string format for the Stop request");
     }
 
-    size_t not_space2 = str.find_first_not_of(' ', comma + 1);
+    // Так как число идет перед буквой 'm', stoi без проблем распарсит число
+    int distance = stoi(string(str.substr(0, distance_end)));
 
-    double lat = stod(std::string(str.substr(not_space, comma - not_space)));
-    double lng = stod(std::string(str.substr(not_space2)));
+    size_t to_end = str.find(' ', distance_end + 1);
+    if (to_end > str.size()) {
+        throw runtime_error("Invalid string format for the Stop request");
+    }
+    string_view stop_name = str.substr(to_end + 1);
+
+    return {stop_name, distance};
+}
+
+namespace Utils {
+
+// Coordinates ParseCoordinates(string_view str) {
+//     static const double nan = std::nan("");
+
+//     size_t not_space = str.find_first_not_of(' ');
+//     size_t comma = str.find(',');
+
+//     if (comma == str.npos) {
+//         return {nan, nan};
+//     }
+
+//     size_t not_space2 = str.find_first_not_of(' ', comma + 1);
+
+//     double lat = stod(std::string(str.substr(not_space, comma - not_space)));
+//     double lng = stod(std::string(str.substr(not_space2)));
+
+//     return {lat, lng};
+// }
+
+Coordinates ParseCoordinates(string_view lat_sv, string_view lng_sv) {
+    double lat = stod(string(lat_sv));
+    double lng = stod(string(lng_sv));
 
     return {lat, lng};
 }

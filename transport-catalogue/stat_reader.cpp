@@ -31,9 +31,11 @@ void DisplayBusInfo(const TransportCatalogue& tansport_catalogue, string_view bu
     if (result == nullopt) {
         output << "Bus " << bus_id << ": not found" << endl;
     } else {
-        output << "Bus " << bus_id << ": " << result->total_stops << " stops on route, "
-                                           << result->uniq_stops  << " unique stops, "
-                                           << result->distance    << " route length" << endl;
+        double curvature = result->road_distance / result->geo_distance;
+        output << "Bus " << bus_id << ": " << result->total_stops   << " stops on route, "
+                                           << result->uniq_stops    << " unique stops, "
+                                           << result->road_distance << " route length, "
+                                           << curvature             << " curvature" << endl;
     }
 }
 
@@ -49,8 +51,12 @@ void DisplayStopInfo(const TransportCatalogue& tansport_catalogue, string_view s
         // Сортировка, т.к. GetStopInfo возвращает массив без сортировки
         vector<string_view> buses_names;
         buses_names.reserve(buses->size());
-        transform(buses->begin(), buses->end(), back_inserter(buses_names), [](const auto& bus) { return bus->name; });
+        for (auto bus : *buses) {
+            buses_names.push_back(bus->name);
+        }
+
         sort(buses_names.begin(), buses_names.end());
+
         output << "Stop " << stop_name << ": buses";
         for (auto name : buses_names) {
             output << ' ' << name;
