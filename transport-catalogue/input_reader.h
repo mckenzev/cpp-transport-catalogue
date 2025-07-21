@@ -48,6 +48,7 @@ private:
     std::vector<Utils::CommandDescription> commands_;
 
     void AddStop(const Utils::CommandDescription& command, TransportCatalogue& catalogue) const;
+    void SetDistances(const Utils::CommandDescription& command, TransportCatalogue& catalogue) const;
     std::pair<std::string_view, int> ParseDistanceToStop(std::string_view str) const;
 };
 

@@ -2,8 +2,6 @@
 
 #include <stdexcept>
 
-#include <iostream> // Удалить
-
 using namespace std;
 using namespace Utils;
 
@@ -15,12 +13,21 @@ void InputReader::ParseLine(string_view line) {
 }
 
 void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue& catalogue) const {
+    // Создание остановок (название - координаты)
     for (auto& command : commands_) {
         if (command.command == "Stop") {
             AddStop(command, catalogue);
         }
     }
 
+    // Установка расстояний между соседними остановками
+    for (auto& command : commands_) {
+        if (command.command == "Stop") {
+            SetDistances(command, catalogue);
+        }
+    }
+
+    // Создание автобусов с маршрутами
     for (auto& command : commands_) {
         if (command.command == "Bus") {
             catalogue.AddBus(command.id, ParseRoute(command.description));
@@ -29,14 +36,18 @@ void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue& catalogue) 
 }
 
 void InputReader::AddStop(const CommandDescription& command, TransportCatalogue& catalogue) const {
-    // под индексом 0 и 1 окажутся долгота и широта. С индекса 2 - строки формата "D[i]m to Stop[i]"
+    // Под индексом 0 и 1 окажутся долгота и широта. С индекса 2 - строки формата "D[i]m to Stop[i]" - расстояния до других остановок
     auto tokens = Split(command.description, ',');
     auto coord = ParseCoordinates(tokens[0], tokens[1]);
     catalogue.AddStop(command.id, coord);
-    // Индексация расстояний до след. остановок начинается с 2
+}
+
+void InputReader::SetDistances(const Utils::CommandDescription& command, TransportCatalogue& catalogue) const {
+    auto tokens = Split(command.description, ',');
+    // Индексация дистанций начинается с индекса 2
     for (size_t i = 2; i < tokens.size(); ++i) {
         auto [to, distance] = ParseDistanceToStop(tokens[i]);
-        catalogue.AddStopsDistance(command.id, to, distance);
+        catalogue.SetRoadDistance(command.id, to, distance);
     }
 }
 
@@ -61,24 +72,6 @@ std::pair<std::string_view, int> InputReader::ParseDistanceToStop(std::string_vi
 }
 
 namespace Utils {
-
-// Coordinates ParseCoordinates(string_view str) {
-//     static const double nan = std::nan("");
-
-//     size_t not_space = str.find_first_not_of(' ');
-//     size_t comma = str.find(',');
-
-//     if (comma == str.npos) {
-//         return {nan, nan};
-//     }
-
-//     size_t not_space2 = str.find_first_not_of(' ', comma + 1);
-
-//     double lat = stod(std::string(str.substr(not_space, comma - not_space)));
-//     double lng = stod(std::string(str.substr(not_space2)));
-
-//     return {lat, lng};
-// }
 
 Coordinates ParseCoordinates(string_view lat_sv, string_view lng_sv) {
     double lat = stod(string(lat_sv));

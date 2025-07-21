@@ -59,7 +59,8 @@ public:
 	 */
 	[[nodiscard]] std::optional<const BusesTable> GetStopInfo(string_view stop_name) const;
 
-	void AddStopsDistance(string_view from, string_view to, int distance);
+	void SetRoadDistance(string_view from, string_view to, int distance);
+	
 	/**
 	 * Поиск дорожного расстояния между остановками `from` и `to`
 	 */
@@ -95,14 +96,4 @@ private:
 	};
 
 	std::unordered_map<StopsPair, int, StopPairHasher> stops_distances_ ;
-
-	/**
-	 * Гарантированно возвращает указатель на остановку.
-	 * При существовании остановки возвращает указатель на нее.
-	 * При отсутствии - создает объек только с полем `name`, но не `coordinates` (0, 0),
-	 * передает в `all_stops_` и `stops_map_` и возвращает указатель на эту остановку
-	 * Работает как operator[] для map
-	 */ 
-	const Stop* GetOrCreateStop(string_view name);
-
 };

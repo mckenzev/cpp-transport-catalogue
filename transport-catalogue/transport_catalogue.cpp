@@ -32,8 +32,10 @@ void TransportCatalogue::AddStop(string_view stop_name, Coordinates coord) {
     // Так как остановка может фигурировать как "соседняя" при создании другой ради указания географического маршрута,
     // эта "соседняя" остановка могла быть создана до ее официального создания через AddStop.
     // поэтому при официальном создании через AddStop проверяется, была ли создана остановка ранее или нет
-    Stop* stop = const_cast<Stop*>(GetOrCreateStop(stop_name));
-    stop->coordinates = coord;
+    Stop stop{string(stop_name), coord};
+    all_stops_.push_back(move(stop));
+    Stop* stop_ptr = &all_stops_.back();
+    stops_map_.emplace(stop_ptr->name, stop_ptr);
 }
 
 const Stop* TransportCatalogue::FindStop(string_view name) const {
@@ -97,11 +99,16 @@ optional<const BusesTable> TransportCatalogue::GetStopInfo(string_view stop_name
     return it == stop_to_buses_.end() ? BusesTable() : it->second;
 }
 
-void TransportCatalogue::AddStopsDistance(string_view from, string_view to, int distance) {
+void TransportCatalogue::SetRoadDistance(string_view from, string_view to, int distance) {
     // Необходимо создать пару string_view, которые ссылаются на оригинальные строки класса,
     // а не из стека, на которые ссылаются параметры функции
-    const Stop* from_ptr = FindStop(from);      // Точно известно, что Stop from существует, поэтому Find
-    const Stop* to_ptr = GetOrCreateStop(to);   // Нет гарантии, что Stop to был ранее создан, поэтому GetOrCreate
+    const Stop* from_ptr = FindStop(from);
+    const Stop* to_ptr = FindStop(to);
+
+    if (from_ptr == nullptr || to_ptr == nullptr) {
+        throw exception(); // Потом подобрать исключение получше
+    }
+
     StopsPair stops_pair = {from_ptr->name, to_ptr->name};
     stops_distances_.emplace(stops_pair, distance);
 }
@@ -132,23 +139,4 @@ std::optional<int> TransportCatalogue::GetRoadDistance(string_view from, string_
 
     // Если ни в одном направлении не удалось найти расстояне, значит оно не было указано
     return nullopt;
-}
-
-const Stop* TransportCatalogue::GetOrCreateStop(string_view name) {
-    // Если удалось найти существующий объект, возвращаем на него указатель
-    if (auto stop_ptr = FindStop(name); stop_ptr != nullptr) {
-        return stop_ptr;
-    }
-
-    // Иначе объекта нет и его надо создать
-    Stop stop{string(name), {0, 0}};
-
-    // Оригиналы остановок хранятся в all_stops_
-    all_stops_.push_back(move(stop));
-
-    Stop* stop_ptr = &all_stops_.back();
-    // А поиск указателей на остановки по наименованию осуществляется через stops_map_
-    stops_map_.emplace(stop_ptr->name, stop_ptr);
-
-    return stop_ptr;
 }
