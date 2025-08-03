@@ -1,9 +1,9 @@
 #include "transport_catalogue.h"
 
 using namespace std;
-using Bus = TransportCatalogue::Bus;
-using Stop = TransportCatalogue::Stop;
-using BusStat = TransportCatalogue::BusStat;
+using Bus = domain::Bus;
+using Stop = domain::Stop;
+using BusStat = domain::BusStat;
 using BusesTable = TransportCatalogue::BusesTable;
 
 void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>& route) {
@@ -28,7 +28,7 @@ void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>&
     }
 }
 
-void TransportCatalogue::AddStop(string_view stop_name, Coordinates coord) {
+void TransportCatalogue::AddStop(string_view stop_name, geo::Coordinates coord) {
     // Так как остановка может фигурировать как "соседняя" при создании другой ради указания географического маршрута,
     // эта "соседняя" остановка могла быть создана до ее официального создания через AddStop.
     // поэтому при официальном создании через AddStop проверяется, была ли создана остановка ранее или нет
@@ -87,7 +87,11 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
         }
     }
 
-    return BusStat{stops.size(), uniq_stops.size(), total_geo_distance, total_road_distance};
+    return BusStat{.geo_distance = total_geo_distance,
+                   .stop_count = static_cast<int>(stops.size()),
+                   .uniq_stops = static_cast<int>(uniq_stops.size()),
+                   .road_distance = total_road_distance
+                };
 }
 
 optional<const BusesTable> TransportCatalogue::GetStopInfo(string_view stop_name) const {

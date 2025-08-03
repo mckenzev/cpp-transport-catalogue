@@ -73,7 +73,7 @@ std::pair<std::string_view, int> InputReader::ParseDistanceToStop(std::string_vi
 
 namespace Utils {
 
-Coordinates ParseCoordinates(string_view lat_sv, string_view lng_sv) {
+geo::Coordinates ParseCoordinates(string_view lat_sv, string_view lng_sv) {
     double lat = stod(string(lat_sv));
     double lng = stod(string(lng_sv));
 

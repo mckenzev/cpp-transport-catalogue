@@ -23,8 +23,7 @@ struct CommandDescription {
     std::string description;  // Параметры команды
 };
 
-// Coordinates ParseCoordinates(std::string_view str);
-Coordinates ParseCoordinates(std::string_view lat_sv, std::string_view lng_sv);
+geo::Coordinates ParseCoordinates(std::string_view lat_sv, std::string_view lng_sv);
 std::string_view Trim(std::string_view string);
 std::vector<std::string_view> Split(std::string_view string, char delim);
 std::vector<std::string_view> ParseRoute(std::string_view route);

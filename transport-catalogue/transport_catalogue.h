@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 
+#include "domain.h"
 #include "geo.h"
 
 class TransportCatalogue {
@@ -16,28 +17,13 @@ using string = std::string;
 using string_view = std::string_view;
 
 public:
-	struct Stop;
-	struct Bus {
-		string name;						// Название автобуса
-		std::vector<const Stop*> stops; 	// Последовательный массив из указателей на остановки маршрута автобуса
-	};
-
-	struct Stop {
-		string name;						// Название остановки
-		Coordinates coordinates; 			// Координаты остановки
-	};
-
-	struct BusStat {
-		size_t total_stops;					// Общее кол-во остановок
-		size_t uniq_stops;					// Кол-во уникальных остановок
-		double geo_distance;				// Сумма геогрифических расстояний между остановками маршрута
-		int road_distance;					// Сумма дорожных расстояний между остановками
-	};
-
+	using Bus = domain::Bus;
 	using BusesTable = std::unordered_set<const Bus*>;
+	using BusStat = domain::BusStat;
+	using Stop = domain::Stop;
 
 	void AddBus(string_view bus_name, const std::vector<string_view>& route);
-	void AddStop(string_view stop_name, Coordinates coord);
+	void AddStop(string_view stop_name, geo::Coordinates coord);
 
 	/**
 	 * Поиск автобуса. При отсутсвии возвращает `nullptr`
