@@ -22,7 +22,7 @@ public:
 	using BusStat = domain::BusStat;
 	using Stop = domain::Stop;
 
-	void AddBus(string_view bus_name, const std::vector<string_view>& route);
+	void AddBus(string_view bus_name, const std::vector<string_view>& route, bool is_roundtrip);
 	void AddStop(string_view stop_name, geo::Coordinates coord);
 
 	/**
@@ -43,7 +43,7 @@ public:
 	/**
 	 * Возвращает `nullopt` если остановка не найдена или неотсортированный вектор(в т.ч. пустой) с остановками
 	 */
-	[[nodiscard]] std::optional<const BusesTable> GetStopInfo(string_view stop_name) const;
+	[[nodiscard]] std::optional<const BusesTable> GetStopStat(string_view stop_name) const;
 
 	void SetRoadDistance(string_view from, string_view to, int distance);
 	
@@ -56,6 +56,10 @@ public:
 	 * Поиск Географического расстояния между остановками `from` и `to`
 	 */
 	std::optional<int> GetGeographicalDistance(string_view from, string_view to) const;
+
+	const std::deque<Stop>& GetAllStops() const noexcept;
+
+	const std::deque<Bus>& GetAllBuses() const noexcept;
 
 private:
 	std::deque<Stop> all_stops_;

@@ -1,12 +1,14 @@
 #include "transport_catalogue.h"
 
+#include <stdexcept>
+
 using namespace std;
 using Bus = domain::Bus;
 using Stop = domain::Stop;
 using BusStat = domain::BusStat;
 using BusesTable = TransportCatalogue::BusesTable;
 
-void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>& route) {
+void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>& route, bool is_roundtrip) {
     vector<const Stop*> final_route;
     final_route.reserve(route.size());
 
@@ -17,7 +19,7 @@ void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>&
         final_route.push_back(stop);
     }
     
-    Bus bus{string(bus_name), move(final_route)};
+    Bus bus{string(bus_name), move(final_route), is_roundtrip};
     all_buses_.push_back(move(bus));
 
     Bus* bus_ptr = &all_buses_.back();
@@ -48,7 +50,7 @@ const Bus* TransportCatalogue::FindBus(string_view name) const {
     return it != buses_map_.end() ? it->second : nullptr;
 }
 
-optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
+optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const { // Подрефакторить
     const Bus* bus = FindBus(bus_id);
     
     if (bus == nullptr) {
@@ -56,6 +58,9 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
     }
 
     const auto& stops = bus->stops;
+    if (stops.empty()) {
+        return {};
+    }
 
     unordered_set<const Stop*> uniq_stops;
     // Размер контейнера точно будет не больше количества остановок, но преждевременная резервация убережет от реаллокаций
@@ -63,38 +68,54 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
     double total_geo_distance = 0.;
     int total_road_distance = 0;
     
-    if (!stops.empty()) {
-        const Stop* prev = stops.front();
-        uniq_stops.insert(stops.front());
+    const Stop* prev = stops.front();
+    uniq_stops.insert(stops.front());
 
-        for (size_t i = 1; i < stops.size(); ++i) {
-            uniq_stops.insert(stops[i]);
+    for (size_t i = 1; i < stops.size(); ++i) {
+        uniq_stops.insert(stops[i]);
+        const Stop* current = stops[i];
+        // Для geo_distance проще напрямую вызывать ComputeDistance, чем GetGeographicalDistance,
+        // т.к. в GetGeographicalDistance из sv опять придется получить указатель на Stop и лишь потом
+        // получаются его координаты для рассчета растояния
+        auto geo_distance = ComputeDistance(prev->coordinates, current->coordinates);
+        total_geo_distance += geo_distance;
+
+        // Если GetRoadDistance вернул не nullopt, то это значение суммируется с total_road_distance
+        if (auto road_distance = GetRoadDistance(prev->name, current->name)) {
+            total_road_distance += *road_distance;
+        } else { // иначе дорожным расстоянием считается географическое
+            total_road_distance += geo_distance;
+        }
+
+        prev = current;
+    }
+
+    if (!bus->is_roundtrip) { // Рассчет расстояния в обратном направлении для некольцевого направления
+        for (size_t i = stops.size() - 1; i-- > 0;) {
             const Stop* current = stops[i];
-            // Для geo_distance проще напрямую вызывать ComputeDistance, чем GetGeographicalDistance,
-            // т.к. в GetGeographicalDistance из sv опять придется получить указатель на Stop и лишь потом
-            // получаются его координаты для рассчета растояния
             auto geo_distance = ComputeDistance(prev->coordinates, current->coordinates);
             total_geo_distance += geo_distance;
 
-            // Если GetRoadDistance вернул не nullopt, то это значение суммируется с total_road_distance
             if (auto road_distance = GetRoadDistance(prev->name, current->name)) {
                 total_road_distance += *road_distance;
-            } else { // иначе дорожным расстоянием считается географическое
+            } else {
                 total_road_distance += geo_distance;
             }
-  
+
             prev = current;
         }
     }
 
-    return BusStat{.geo_distance = total_geo_distance,
-                   .stop_count = static_cast<int>(stops.size()),
-                   .uniq_stops = static_cast<int>(uniq_stops.size()),
-                   .road_distance = total_road_distance
-                };
+    int stop_count = bus->is_roundtrip ? stops.size() : stops.size() * 2 - 1;
+    return BusStat{
+        .geo_distance = total_geo_distance,
+        .stop_count = stop_count,
+        .uniq_stops = static_cast<int>(uniq_stops.size()),
+        .road_distance = total_road_distance
+    };
 }
 
-optional<const BusesTable> TransportCatalogue::GetStopInfo(string_view stop_name) const {
+optional<const BusesTable> TransportCatalogue::GetStopStat(string_view stop_name) const {
     if (FindStop(stop_name) == nullptr) {
         return nullopt;
     }
@@ -110,7 +131,9 @@ void TransportCatalogue::SetRoadDistance(string_view from, string_view to, int d
     const Stop* to_ptr = FindStop(to);
 
     if (from_ptr == nullptr || to_ptr == nullptr) {
-        throw exception(); // Потом подобрать исключение получше
+        throw runtime_error("It is impossible to set the distance between \""s
+                            + string(from) + "\" and \"" + string(to)
+                            + "\" due to the fact that one of the stops is not in the TransportCatalogue"s);
     }
 
     StopsPair stops_pair = {from_ptr->name, to_ptr->name};
@@ -143,4 +166,12 @@ std::optional<int> TransportCatalogue::GetRoadDistance(string_view from, string_
 
     // Если ни в одном направлении не удалось найти расстояне, значит оно не было указано
     return nullopt;
+}
+
+const std::deque<Stop>& TransportCatalogue::GetAllStops() const noexcept {
+    return all_stops_;
+}
+
+const std::deque<Bus>& TransportCatalogue::GetAllBuses() const noexcept {
+    return all_buses_;
 }

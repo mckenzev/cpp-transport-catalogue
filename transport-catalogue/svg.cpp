@@ -1,11 +1,8 @@
 #include "svg.h"
 
-#include <format>
-#include <unordered_map>
-
 namespace svg {
 
-using namespace std::literals;
+using namespace std;
 
 void Object::Render(const RenderContext& context) const {
     // Вывод отступа
@@ -15,7 +12,7 @@ void Object::Render(const RenderContext& context) const {
     RenderObject(context);
 
     // Вывод переноса строки
-    context.out << std::endl;
+    context.out << endl;
 }
 
 // ---------- Circle ------------------
@@ -32,7 +29,7 @@ Circle& Circle::SetRadius(double radius)  {
 
 void Circle::RenderObject(const RenderContext& context) const {
     auto& out = context.out;
-    out << std::format("<circle cx=\"{}\" cy=\"{}\" r=\"{}\" ", center_.x, center_.y, radius_);
+    out << format("<circle cx=\"{:.6g}\" cy=\"{:.6g}\" r=\"{:.6g}\"", center_.x, center_.y, radius_);
 
     RenderAttrs(out);
 
@@ -48,7 +45,7 @@ Polyline& Polyline::AddPoint(Point point) {
 
 void Polyline::RenderObject(const RenderContext& context) const {
     auto& out = context.out;
-    out << "<polyline points=\""sv;
+    out << "<polyline points=\"";
 
     for (size_t i = 0; i < points_.size(); ++i) {
         if (i != 0) {
@@ -57,7 +54,7 @@ void Polyline::RenderObject(const RenderContext& context) const {
         out << points_[i];
     }
 
-    out << "\" "sv; // Закрывающаяся скобка перечисления точек
+    out << '\"'; // Кавычка закрывающаяся перечисления точек
 
     RenderAttrs(out);
 
@@ -82,21 +79,21 @@ Text& Text::SetFontSize(uint32_t size) {
     return *this;
 }
 
-Text& Text::SetFontFamily(std::string font_family) {
-    font_family_ = std::move(font_family);
+Text& Text::SetFontFamily(string font_family) {
+    font_family_ = move(font_family);
     return *this;
 }
 
-Text& Text::SetFontWeight(std::string font_weight) {
-    font_weight_ = std::move(font_weight);
+Text& Text::SetFontWeight(string font_weight) {
+    font_weight_ = move(font_weight);
     return *this;
 }
 
-Text& Text::SetData(std::string data) {
-    static const std::unordered_map<char, std::string> kTegs = {
-        {'\"', "&quot;"},   {'\'', "&apos;"},
-        {'<', "&lt;"},      {'>', "&gt;"},
-        {'&', "&amp;"}
+Text& Text::SetData(string data) {
+    static const unordered_map<char, string_view> kTegs = {
+        {'\"', "&quot;"sv},   {'\'', "&apos;"sv},
+        {'<', "&lt;"sv},      {'>', "&gt;"sv},
+        {'&', "&amp;"sv}
     };
 
     std::string result;
@@ -118,13 +115,13 @@ Text& Text::SetData(std::string data) {
 
 void Text::RenderObject(const RenderContext& context) const {
     auto& out = context.out;
-    out << "<text "sv;
+    out << "<text";
     
     RenderAttrs(out);
 
-    out << std::format(" x=\"{}\" y=\"{}\" ", pos_.x, pos_.y);
-    out << std::format("dx=\"{}\" dy=\"{}\" ", offset_.x, offset_.y);
-    out << std::format("font-size=\"{}\"", font_size_);
+    out << std::format(" x=\"{:.6g}\" y=\"{:.6g}\"", pos_.x, pos_.y);
+    out << std::format(" dx=\"{:.6g}\" dy=\"{:.6g}\"", offset_.x, offset_.y);
+    out << std::format(" font-size=\"{}\"", font_size_);
 
     if (font_family_.has_value()) {
         out << std::format(" font-family=\"{}\"", *font_family_);
@@ -147,7 +144,7 @@ void Document::Render(std::ostream& out) const {
     out << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n"
         << "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\n";
     
-    RenderContext context(out, 1, 0);
+    RenderContext context(out, 2, 2);
     for (const auto& obj : objects_) {
         obj->Render(context);
     }

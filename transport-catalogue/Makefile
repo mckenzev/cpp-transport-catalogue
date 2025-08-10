@@ -11,6 +11,7 @@ SOURCE = geo.cpp \
 		 json.cpp \
 		 map_renderer.cpp \
 		 request_handler.cpp \
+		 svg.cpp \
 		 main.cpp
 EXE = run.exe
 

@@ -1,16 +1,13 @@
 #pragma once
 
-#define _USE_MATH_DEFINES
-#include <cmath>
 #include <cstdint>
 #include <format>
-#include <stdexcept>
-#include <deque>
 #include <iostream>
 #include <memory>
 #include <optional>
-#include <vector>
 #include <variant>
+#include <vector>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
@@ -27,7 +24,7 @@ struct Point {
 };
 
 inline std::ostream& operator<<(std::ostream& out, const Point p) {
-    out << p.x << ',' << p.y;
+    out << std::format("{:.6g},{:.6g}", p.x, p.y);
     return out;
 }
 
@@ -94,17 +91,17 @@ struct Rgba {
 };
 
 inline std::ostream& operator<<(std::ostream& out, Rgba rgba) {
-    out << std::format("rgba({},{},{},{})", rgba.red, rgba.green, rgba.blue, rgba.opacity);
+    out << std::format("rgba({},{},{},{:.6g})", rgba.red, rgba.green, rgba.blue, rgba.opacity);
     return out;
 }
 
 using Color = std::variant<std::monostate, std::string, Rgb, Rgba>;
-inline const Color NoneColor = "none";
+inline const Color NoneColor = std::monostate();
 
 inline std::ostream& operator<<(std::ostream& out, Color color) {
     using namespace std;
     if (holds_alternative<monostate>(color)) {
-        out << get<string>(NoneColor);
+        out << "none";
     } else if (holds_alternative<string>(color)){
         out << get<string>(color);
     } else if (holds_alternative<Rgb>(color)) {
@@ -167,7 +164,7 @@ inline std::ostream& operator<<(std::ostream& out, StrokeLineJoin line_join) {
     }
     
     out << it->second;
-    
+
     return out;
 }
 
@@ -203,8 +200,6 @@ protected:
     ~PathProps() = default;
 
     void RenderAttrs(std::ostream& out) const {
-        using namespace std::literals;
-
         if (fill_color_) {
             out << " fill=\"" << *fill_color_ << "\"";
         }
@@ -214,15 +209,15 @@ protected:
         }
 
         if (width_) {
-            out << " stroke-width=\"" << *width_ <<  "\"";
+            out << " stroke-width=\"" << *width_ << "\"";
         }
 
         if (line_cap_) {
-            out << " stroke-linecap=\"" << *line_cap_ <<  "\"";
+            out << " stroke-linecap=\"" << *line_cap_ << "\"";
         }
 
         if (line_join_) {
-            out << " stroke-linejoin=\"" << *line_join_ <<  "\"";
+            out << " stroke-linejoin=\"" << *line_join_ << "\"";
         }
     }
 
@@ -232,7 +227,6 @@ private:
     std::optional<double> width_;
     std::optional<StrokeLineCap> line_cap_;
     std::optional<StrokeLineJoin> line_join_;
-
 
     Owner& AsOwner() {
         return static_cast<Owner&>(*this);
@@ -265,6 +259,7 @@ public:
 
 private:
     void RenderObject(const RenderContext& context) const override;
+    
     std::vector<Point> points_;
 };
 
@@ -294,6 +289,12 @@ private:
 
 class ObjectContainer {
 public:
+    ObjectContainer() = default;
+    ObjectContainer(const ObjectContainer&) = delete;
+    ObjectContainer& operator=(const ObjectContainer&) = delete;
+    ObjectContainer(ObjectContainer&&) = default;
+    ObjectContainer& operator=(ObjectContainer&&) = default;
+
     template <typename T>
     void Add(T obj) {
         AddPtr(std::make_unique<T>(std::move(obj))); 
@@ -319,95 +320,5 @@ public:
     void AddPtr(std::unique_ptr<Object>&& obj) override;
     void Render(std::ostream& out) const;  
 };
-
-class Drawable {
-public:
-    virtual void Draw(ObjectContainer& container) const = 0;
-    virtual ~Drawable() = default;
-};
-
-namespace shapes {
-
-class Triangle : public Drawable {
-public:
-    Triangle(svg::Point p1, svg::Point p2, svg::Point p3)
-        : p1_(p1)
-        , p2_(p2)
-        , p3_(p3) {
-    }
-
-    // Реализует метод Draw интерфейса svg::Drawable
-    void Draw(ObjectContainer& container) const override {
-        container.Add(Polyline().AddPoint(p1_).AddPoint(p2_).AddPoint(p3_).AddPoint(p1_));
-    }
-
-private:
-    svg::Point p1_, p2_, p3_;
-};
-
-class Star : public Drawable {
-public:
-    Star(Point center, double outer_rad, double inner_rad, int num_rays)
-        : center_(center), outer_rad_(outer_rad),
-          inner_rad_(inner_rad), num_rays_(num_rays) {}
-
-    void Draw(ObjectContainer& container) const override {
-        Polyline star;
-        for (int i = 0; i <= num_rays_; ++i) {
-            double angle = 2 * M_PI * (i % num_rays_) / num_rays_;
-            star.AddPoint({center_.x + outer_rad_ * sin(angle), center_.y - outer_rad_ * cos(angle)});
-            
-            if (i == num_rays_) {
-                break;
-            }
-
-            angle += M_PI / num_rays_;
-            star.AddPoint({center_.x + inner_rad_ * sin(angle), center_.y - inner_rad_ * cos(angle)});
-        }
-
-        star.SetFillColor("red").SetStrokeColor("black");
-        container.Add(std::move(star));
-    }
-
-private:
-    Point center_;
-    double outer_rad_;
-    double inner_rad_;
-    int num_rays_;
-};
-
-class Snowman : public Drawable {
-public:
-    Snowman(Point center, double radius)
-        : center_(center), radius_(radius) {}
-
-    void Draw(ObjectContainer& container) const override {
-        constexpr int circle_num = 3;
-        std::deque<Circle> tmp_deq;
-        Point center = center_;
-        double radius = radius_;
-        double offset = radius_ * 2;
-        for (int i = 0; i < circle_num; ++i) {
-            Circle circle = Circle().SetCenter(center)
-                                    .SetRadius(radius)
-                                    .SetFillColor("rgb(240,240,240)")
-                                    .SetStrokeColor("black");
-            tmp_deq.emplace_front(std::move(circle));
-            center.y += offset;
-            offset += radius_;
-            radius += 0.5 * radius_;
-        }
-        
-        for (auto&& a : tmp_deq) {
-            container.Add(std::move(a));
-        }
-    }
-
-private:
-    Point center_;
-    double radius_;
-};
-
-} // namespace shapes
 
 }  // namespace svg

@@ -1,8 +1,7 @@
 #include "json.h"
 
-#include <array>
 #include <cctype>
-#include <cmath>
+#include <type_traits>
 
 using namespace std;
 
@@ -241,9 +240,12 @@ struct Node::PrintNode {
     std::ostream& out;
     uint8_t offset;
 
+    void PrintOffset(uint8_t value) const {
+        out << string(value * 2, ' ');
+    }
+
     template <typename T>
     void operator()(const T& val) const {
-        out << string(offset, '\t');
         Print(val);
     }
 
@@ -265,62 +267,71 @@ struct Node::PrintNode {
 
     void Print(const Array& array) const {
         out << "[\n";
+        // то, что находится в фигурных скобках, должно на 1 таб отступать от отступа блока массива
+        PrintOffset(offset + 1);
         bool wait_comma = false;
         for (const auto& item : array) {
             if (wait_comma) {
                 out << ",\n";
+                // Так как произошел перенос строки отступ такой же, как при установке скобки
+                PrintOffset(offset + 1);
             }
+            // При принте следуюзих данных будет информация, что отступ отличается на 1 таб
             item.Print(out, offset + 1);
             wait_comma = true;
         }
-        out << '\n' << string(offset, '\t') << "]";
+        out << '\n';
+        
+        // отступ на уровне открывающейся скобки
+        PrintOffset(offset);
+        out << ']';
     }
 
     void Print(const Dict& dict) const {
         out << "{\n";
+        PrintOffset(offset + 1);
         bool wait_comma = false;
         for (auto [key, value] : dict) {
             if (wait_comma) {
                 out << ",\n";
+                PrintOffset(offset + 1);
             }
-            out << string(offset + 1, '\t') << '"' << key << "\" : ";
-            value.Print(out);
+            out << '"' << key << "\": ";
+            value.Print(out, offset + 1);
             wait_comma = true;
         }
-        out << '\n' << string(offset, '\t') << "}";
+        out << '\n';
+        PrintOffset(offset);
+        out << '}';
+    }
+
+    string TranscriptEscapedSimbol(char c) const {
+        switch (c) {
+            case '\"': return "\\\"";
+            case '\\': return "\\\\";
+            case '\n': return "\\n";
+            case '\r': return "\\r";
+            case '\t': return "\\t";
+            default: return string(1, c);
+        }
     }
 
     void Print(const string& str) const {
         string escaped;
-        escaped.reserve(str.size() * 1.1); // С эскейп последовательностями строка будет больше искомой
+        escaped.reserve(str.size() * 1.1); // С эскейп последовательностями строка будет больше исходной
         for (const auto c : str) {
-            switch (c) {
-                case '\"':
-                    escaped += "\\\"";
-                    break;
-                case '\\':
-                    escaped += "\\\\";
-                    break;
-                case '\n':
-                    escaped += "\\n";
-                    break;
-                case '\r':
-                    escaped += "\\r";
-                    break;
-                case '\t':
-                    escaped += "\\t";
-                    break;
-                default:
-                    escaped += c;
-                    break;
-            }
+            escaped += TranscriptEscapedSimbol(c);
         }
         out << '\"' << escaped << '\"';
     }
 };
 
 // ------------- Node ---------------
-
+/**
+ * Array, Dict, string принимаются по значению, чтобы их можно было переместить в data_
+ * Иначе при приеме по константной ссылке все равно приходилось бы производить копирование,
+ * а для r-value пришлось бы сделать отдельную перегрузка
+ */
 Node::Node(Array array) : data_(move(array)) {}
 Node::Node(Dict map) : data_(move(map)) {}
 Node::Node(int value) : data_(value) {}
@@ -329,50 +340,54 @@ Node::Node(double value) : data_(value) {}
 Node::Node(bool value) : data_(value) {}
 Node::Node(std::nullptr_t value) : data_(value) {}
 
+
+
 template <typename T>
-const T& Node::AsRef() const {
-    if (!holds_alternative<T>(data_)) {
-        throw std::logic_error("Invalid convertion");
+T Node::GetValueOrThrow(const string& type_name) const {
+    try {
+        return get<T>(data_);
+    } catch (const bad_variant_access&) {
+        throw logic_error("Exception when trying to convert Node to "s + type_name);
     }
-    return get<T>(data_);
 }
 
 template <typename T>
-T Node::AsVal() const {
-    if (!holds_alternative<T>(data_)) {
-        throw std::logic_error("Invalid convertion");
+const T& Node::GetRefOrThrow(const string& type_name) const {
+    try {
+        return get<T>(data_);
+    } catch (const bad_variant_access&) {
+        throw logic_error("Exception when trying to convert Node to "s + type_name);
     }
-    return get<T>(data_);
 }
 
 int Node::AsInt() const {
-    return AsVal<int>();
+    return GetValueOrThrow<int>("int");
 }
 
 bool Node::AsBool() const {
-    return AsVal<bool>();
+    return GetValueOrThrow<bool>("bool");
 }
 
 double Node::AsDouble() const {
     // Если значение хранится как double, оно будет возвращено как double
     if (IsPureDouble()) {
-        return AsVal<double>();
+        return GetValueOrThrow<double>("double");
     }
 
-    // Иначе получено как int и возвращено после преобразования в bouble
-    return AsVal<int>();
+    // Иначе получено как int и возвращено после преобразования в double
+    return GetValueOrThrow<int>("double");
 }
 
 const string& Node::AsString() const {
-    return AsRef<string>();
+    return GetRefOrThrow<string>("string");
 }
 
 const Array& Node::AsArray() const {
-    return AsRef<Array>();
+    return GetRefOrThrow<Array>("Array");
 }
 
 const Dict& Node::AsMap() const {
-    return AsRef<Dict>();
+    return GetRefOrThrow<Dict>("Dict");
 }
 
 bool Node::IsInt() const {
@@ -409,11 +424,11 @@ bool Node::IsMap() const {
     return holds_alternative<Dict>(data_);
 }
 
-bool Node::operator==(const Node& rhs) const {
+constexpr bool Node::operator==(const Node& rhs) const noexcept {
     return data_ == rhs.data_;
 }
 
-bool Node::operator!=(const Node& rhs) const {
+constexpr bool Node::operator!=(const Node& rhs) const noexcept {
     return !(*this == rhs);
 }
 
