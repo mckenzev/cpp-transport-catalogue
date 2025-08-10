@@ -24,8 +24,8 @@ private:
     // Разделяет запросы из `base_requests` на запросы по созданию Stop и запросы по созданию Bus
     std::pair<std::vector<json::Dict>, std::vector<json::Dict>> SplitRequests(const json::Array& base_requests) const;
 
-    void AddStops(const std::vector<json::Dict>& stops_prop);
-    void AddBuses(const std::vector<json::Dict>& buses_prop);
+    void ParseStops(const std::vector<json::Dict>& stops_prop);
+    void ParseBuses(const std::vector<json::Dict>& buses_prop);
     void SetRoadDistances(const std::vector<json::Dict>& stops_prop);
     std::vector<std::string_view> CreateRoute(const json::Array &stops) const;
     json::Dict MakeStopResponse(int id, const std::string& name) const;

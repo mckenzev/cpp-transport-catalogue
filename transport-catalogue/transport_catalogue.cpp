@@ -131,9 +131,7 @@ void TransportCatalogue::SetRoadDistance(string_view from, string_view to, int d
     const Stop* to_ptr = FindStop(to);
 
     if (from_ptr == nullptr || to_ptr == nullptr) {
-        throw runtime_error("It is impossible to set the distance between \""s
-                            + string(from) + "\" and \"" + string(to)
-                            + "\" due to the fact that one of the stops is not in the TransportCatalogue"s);
+        return;
     }
 
     StopsPair stops_pair = {from_ptr->name, to_ptr->name};

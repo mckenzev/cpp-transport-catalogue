@@ -20,9 +20,9 @@ void JsonReader::ParseBaseRequests() {
     
     auto [stops_prop, buses_prop] = SplitRequests(base_requests);
 
-    AddStops(stops_prop);
+    ParseStops(stops_prop);
     SetRoadDistances(stops_prop);
-    AddBuses(buses_prop);
+    ParseBuses(buses_prop);
 }
 
 void JsonReader::ParseStatRequests() {
@@ -58,8 +58,8 @@ pair<vector<Dict>, vector<Dict>> JsonReader::SplitRequests(const Array& base_req
     vector<Dict> buses_prop;
     
     for (const auto& request : base_requests) {
-        auto& request_prop = request.AsMap();
-        auto& type = request_prop.at("type").AsString();
+        const auto& request_prop = request.AsMap();
+        const auto& type = request_prop.at("type").AsString();
         if (type == "Bus") {
             buses_prop.emplace_back(request_prop);
         } else if (type == "Stop") {
@@ -72,7 +72,7 @@ pair<vector<Dict>, vector<Dict>> JsonReader::SplitRequests(const Array& base_req
     return {move(stops_prop), move(buses_prop)};
 }
 
-void JsonReader::AddStops(const vector<Dict>& stops_prop) {
+void JsonReader::ParseStops(const vector<Dict>& stops_prop) {
     for (const auto& stop : stops_prop) {
         string_view name = stop.at("name").AsString();
         double lat = stop.at("latitude").AsDouble();
@@ -108,10 +108,10 @@ vector<string_view> JsonReader::CreateRoute(const Array &stops) const {
     return result;
 }
 
-void JsonReader::AddBuses(const vector<Dict>& buses_prop) {
+void JsonReader::ParseBuses(const vector<Dict>& buses_prop) {
     for (const auto& bus : buses_prop) {
         string_view name = bus.at("name").AsString();
-        auto& stops = bus.at("stops").AsArray();
+        const auto& stops = bus.at("stops").AsArray();
         
         // пустой список остановок из-за гарантий задания не попадется, но все же такая проверка есть
         if (stops.empty()) {

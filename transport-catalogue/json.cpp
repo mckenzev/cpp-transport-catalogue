@@ -249,6 +249,10 @@ struct Node::PrintNode {
         Print(val);
     }
 
+    void Print(nullptr_t) const {
+        out << "null";
+    }
+
     void Print(int num) const {
         out << num;
     }
@@ -257,26 +261,42 @@ struct Node::PrintNode {
         out << num;
     }
 
+    string TranscriptEscapedSimbol(char c) const {
+        switch (c) {
+            case '\"': return "\\\"";
+            case '\\': return "\\\\";
+            case '\n': return "\\n";
+            case '\r': return "\\r";
+            case '\t': return "\\t";
+            default: return string(1, c);
+        }
+    }
+
+    void Print(const string& str) const {
+        string escaped;
+        escaped.reserve(str.size() * 1.1); // С эскейп последовательностями строка будет больше исходной
+        for (const auto c : str) {
+            escaped += TranscriptEscapedSimbol(c);
+        }
+        out << '\"' << escaped << '\"';
+    }
+
     void Print(bool val) const {
         out << (val ? "true" : "false");
     }
 
-    void Print(nullptr_t) const {
-        out << "null";
-    }
-
     void Print(const Array& array) const {
         out << "[\n";
-        // то, что находится в фигурных скобках, должно на 1 таб отступать от отступа блока массива
+        // то, что находится в квадратных скобках, должно на 1 таб отступать от отступа блока массива
         PrintOffset(offset + 1);
         bool wait_comma = false;
         for (const auto& item : array) {
             if (wait_comma) {
                 out << ",\n";
-                // Так как произошел перенос строки отступ такой же, как при установке скобки
+                // Так как произошел перенос строки, отступ такой же, как при установке скобки
                 PrintOffset(offset + 1);
             }
-            // При принте следуюзих данных будет информация, что отступ отличается на 1 таб
+            // При принте следующих данных будет информация, что отступ отличается на 1 таб
             item.Print(out, offset + 1);
             wait_comma = true;
         }
@@ -305,47 +325,14 @@ struct Node::PrintNode {
         out << '}';
     }
 
-    string TranscriptEscapedSimbol(char c) const {
-        switch (c) {
-            case '\"': return "\\\"";
-            case '\\': return "\\\\";
-            case '\n': return "\\n";
-            case '\r': return "\\r";
-            case '\t': return "\\t";
-            default: return string(1, c);
-        }
-    }
-
-    void Print(const string& str) const {
-        string escaped;
-        escaped.reserve(str.size() * 1.1); // С эскейп последовательностями строка будет больше исходной
-        for (const auto c : str) {
-            escaped += TranscriptEscapedSimbol(c);
-        }
-        out << '\"' << escaped << '\"';
-    }
 };
 
 // ------------- Node ---------------
-/**
- * Array, Dict, string принимаются по значению, чтобы их можно было переместить в data_
- * Иначе при приеме по константной ссылке все равно приходилось бы производить копирование,
- * а для r-value пришлось бы сделать отдельную перегрузка
- */
-Node::Node(Array array) : data_(move(array)) {}
-Node::Node(Dict map) : data_(move(map)) {}
-Node::Node(int value) : data_(value) {}
-Node::Node(string value) : data_(move(value)) {}
-Node::Node(double value) : data_(value) {}
-Node::Node(bool value) : data_(value) {}
-Node::Node(std::nullptr_t value) : data_(value) {}
-
-
 
 template <typename T>
 T Node::GetValueOrThrow(const string& type_name) const {
     try {
-        return get<T>(data_);
+        return get<T>(*this);
     } catch (const bad_variant_access&) {
         throw logic_error("Exception when trying to convert Node to "s + type_name);
     }
@@ -354,7 +341,7 @@ T Node::GetValueOrThrow(const string& type_name) const {
 template <typename T>
 const T& Node::GetRefOrThrow(const string& type_name) const {
     try {
-        return get<T>(data_);
+        return get<T>(*this);
     } catch (const bad_variant_access&) {
         throw logic_error("Exception when trying to convert Node to "s + type_name);
     }
@@ -391,16 +378,16 @@ const Dict& Node::AsMap() const {
 }
 
 bool Node::IsInt() const {
-    return holds_alternative<int>(data_);
+    return holds_alternative<int>(*this);
 }
 
 bool Node::IsBool() const {
-    return holds_alternative<bool>(data_);
+    return holds_alternative<bool>(*this);
 }
 
 // Возвращает true, если в Node хранится double.
 bool Node::IsPureDouble() const {
-    return holds_alternative<double>(data_);
+    return holds_alternative<double>(*this);
 }
 
 // Возвращает true, если в Node хранится int либо double.
@@ -409,23 +396,24 @@ bool Node::IsDouble() const {
 } 
 
 bool Node::IsString() const {
-    return holds_alternative<string>(data_);
+    return holds_alternative<string>(*this);
 }
 
 bool Node::IsNull() const {
-    return holds_alternative<nullptr_t>(data_);
+    return holds_alternative<nullptr_t>(*this);
 }
 
 bool Node::IsArray() const {
-    return holds_alternative<Array>(data_);
+    return holds_alternative<Array>(*this);
 }
 
 bool Node::IsMap() const {
-    return holds_alternative<Dict>(data_);
+    return holds_alternative<Dict>(*this);
 }
 
 constexpr bool Node::operator==(const Node& rhs) const noexcept {
-    return data_ == rhs.data_;
+    // т.к. Node приватно наследуется от variant, изнутри Node его можно кастануть к variant& и получить доступ к некогда публичным, но уже приватным методам (opeartor==)
+    return static_cast<const variant&>(*this) == static_cast<const variant&>(rhs);
 }
 
 constexpr bool Node::operator!=(const Node& rhs) const noexcept {
@@ -433,7 +421,8 @@ constexpr bool Node::operator!=(const Node& rhs) const noexcept {
 }
 
 void Node::Print(std::ostream& out, uint8_t offset) const {
-    visit(PrintNode{out, offset}, data_);
+    // Та же ситуация и для visit, который так же использует публичные методы variant, которые из-за наследования стали недоступными из вне
+    visit(PrintNode{out, offset}, static_cast<const variant&>(*this));
 }
 
 // ------------- Document ---------------

@@ -20,24 +20,9 @@ public:
     using runtime_error::runtime_error;
 };
 
-class Node {
+class Node final : private std::variant<std::nullptr_t, int, double, std::string, bool, Array, Dict> {
 public:
-    using NodeData = std::variant<int,
-                                  double,
-                                  std::string,
-                                  bool,
-                                  Array,
-                                  Dict,
-                                  std::nullptr_t>;
-
-    Node() : Node(nullptr) {}
-    Node(Array array);
-    Node(Dict map);
-    Node(std::string value);
-    Node(int value);
-    Node(double value);
-    Node(bool value);
-    Node(std::nullptr_t value);
+    using variant::variant;
 
     int AsInt() const;
     bool AsBool() const;
@@ -61,7 +46,6 @@ public:
     void Print(std::ostream& out, uint8_t offset = 0) const;
 
 private:
-    NodeData data_;
 
     /**
      * Методы для As* методов, чтобы при ошибке при конвертации можно было увидеть для какого типа вылетело исключение
