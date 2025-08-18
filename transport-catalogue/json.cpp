@@ -329,6 +329,14 @@ struct Node::PrintNode {
 
 // ------------- Node ---------------
 
+Node::Value& Node::GetValue() {
+    return *this;
+}
+
+const Node::Value& Node::GetValue() const {
+    return *this;
+}
+
 template <typename T>
 T Node::GetValueOrThrow(const string& type_name) const {
     try {

@@ -32,5 +32,7 @@
 *.app
 
 .vscode
-# Makefile
+Makefile
 *.txt
+*.json
+*.svg

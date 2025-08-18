@@ -8,6 +8,7 @@ SOURCE = geo.cpp \
 		 transport_catalogue.cpp \
 		 domain.cpp \
 		 json_reader.cpp \
+		 json_builder.cpp \
 		 json.cpp \
 		 map_renderer.cpp \
 		 request_handler.cpp \

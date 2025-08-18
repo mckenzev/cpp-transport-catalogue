@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "domain.h"
-#include "json.h"
+#include "json_builder.h"
 #include "request_handler.h"
 
 class JsonReader {
@@ -28,8 +28,8 @@ private:
     void ParseBuses(const std::vector<json::Dict>& buses_prop);
     void SetRoadDistances(const std::vector<json::Dict>& stops_prop);
     std::vector<std::string_view> CreateRoute(const json::Array &stops) const;
-    json::Dict MakeStopResponse(int id, const std::string& name) const;
-    json::Dict MakeBusResponse(int id, const std::string& name) const;
-    json::Dict RenderMap(int id) const;
+    json::Node MakeStopResponse(int id, const std::string& name) const;
+    json::Node MakeBusResponse(int id, const std::string& name) const;
+    json::Node RenderMap(int id) const;
     domain::dto::RenderSettings GetRenderSettings() const;
 };

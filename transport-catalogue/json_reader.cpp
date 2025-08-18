@@ -29,8 +29,8 @@ void JsonReader::ParseStatRequests() {
     const auto& all_requests = doc_.GetRoot().AsMap();
     const auto& stat_requests = all_requests.at("stat_requests").AsArray();
 
-    Array responses;
-    responses.reserve(stat_requests.size());
+    Builder builder;
+    auto array = builder.StartArray();
 
     for (const auto& request : stat_requests) {
         const auto& request_prop = request.AsMap();
@@ -39,18 +39,19 @@ void JsonReader::ParseStatRequests() {
         
         if (type == "Stop") {
             const auto& name = request_prop.at("name").AsString();
-            responses.push_back(MakeStopResponse(id, name));
+            array.Value(MakeStopResponse(id, name).GetValue());
         } else if (type == "Bus") {
-            auto& name = request_prop.at("name").AsString();
-            responses.push_back(MakeBusResponse(id, name));
+            const auto& name = request_prop.at("name").AsString();
+            array.Value(MakeBusResponse(id, name).GetValue());
         } else if (type == "Map") {
-            responses.push_back(RenderMap(id));
+            array.Value(RenderMap(id).GetValue());
         } else {
             throw std::runtime_error("Unable type \""s + type + "\" in \"stat_requests\" on json");
         }
     }
 
-    json::Print(Document({responses}), output_);
+    auto json_object = array.EndArray().Build();
+    json::Print(Document{std::move(json_object)}, output_);
 }
 
 pair<vector<Dict>, vector<Dict>> JsonReader::SplitRequests(const Array& base_requests) const {
@@ -125,14 +126,16 @@ void JsonReader::ParseBuses(const vector<Dict>& buses_prop) {
     }
 }
 
-Dict JsonReader::MakeStopResponse(int id, const string& name) const {
+Node JsonReader::MakeStopResponse(int id, const string& name) const {
     auto buses_table = handler_.GetStopStat(name);
     
     if (!buses_table.has_value()) {
-        return {
-            {"request_id"s, id},
-            {"error_message"s, "not found"s}
-        };
+        return Builder()
+            .StartDict()
+                .Key("request_id"s).Value(id)
+                .Key("error_message"s).Value("not found"s)
+            .EndDict()
+        .Build();
     }
 
     vector<string> buses;
@@ -144,40 +147,53 @@ Dict JsonReader::MakeStopResponse(int id, const string& name) const {
 
     sort(buses.begin(), buses.end());
 
-    auto m_begin = make_move_iterator(buses.begin());
-    auto m_end = make_move_iterator(buses.end());
-    Array json_array(m_begin, m_end);
+    Builder builder;
+    auto array = builder.StartArray();
 
-    return {
-        {"request_id"s, id},
-        {"buses"s, Node(move(json_array))}
-    };
+    for (auto& bus : buses) {
+        array.Value(std::move(bus));
+    }
+    
+    Node::Value data = move(array.EndArray().Build().GetValue());
+
+    return Builder()
+        .StartDict()
+            .Key("request_id"s).Value(id)
+            .Key("buses"s).Value(move(data))
+        .EndDict()
+    .Build();
 }
 
-Dict JsonReader::MakeBusResponse(int id, const string& name) const {
+Node JsonReader::MakeBusResponse(int id, const string& name) const {
     auto stats = handler_.GetBusStat(name); 
     if (!stats.has_value()) {
-        return {
-            {"request_id"s, id},
-            {"error_message"s, "not found"s}
-        };
+        return Builder()
+            .StartDict()
+                .Key("request_id"s).Value(id)
+                .Key("error_message"s).Value("not found"s)
+            .EndDict()
+        .Build();
     }
 
-    return {
-        {"request_id"s, id},
-        {"route_length"s, stats->road_distance},
-        {"curvature"s, stats->road_distance / stats->geo_distance},
-        {"stop_count"s, stats->stop_count},
-        {"unique_stop_count"s, stats->uniq_stops}
-    };
+    return Builder()
+        .StartDict()
+            .Key("request_id"s).Value(id)
+            .Key("route_length"s).Value(stats->road_distance)
+            .Key("curvature"s).Value(stats->road_distance / stats->geo_distance)
+            .Key("stop_count"s).Value(stats->stop_count)
+            .Key("unique_stop_count"s).Value(stats->uniq_stops)
+        .EndDict()
+    .Build();
 }
 
-Dict JsonReader::RenderMap(int id) const {
-    auto render_map = handler_.RenderMap();
-    Dict response;
-    response.emplace("request_id"s, json::Node(id));
-    response.emplace("map"s, Node(render_map));
-    return response;
+Node JsonReader::RenderMap(int id) const {
+    string render_map = handler_.RenderMap();
+    return Builder()
+        .StartDict()
+            .Key("request_id"s).Value(id)
+            .Key("map"s).Value(move(render_map))
+        .EndDict()
+    .Build();
 }
 
 // Анонимное пространство имен для вспомогательных функций для парса
@@ -232,7 +248,7 @@ vector<domain::dto::Color> CreateColorPalette(const Array& json_array) {
     return result;
 }
 
-domain::dto::Point ParsePoit(const Array& json_array) {
+domain::dto::Point ParsePoint(const Array& json_array) {
     if (json_array.size() == 2) {
         return domain::dto::Point{
             .x = json_array[0].AsDouble(),
@@ -271,8 +287,8 @@ domain::dto::RenderSettings JsonReader::GetRenderSettings() const {
         .bus_label_font_size = bus_label_font_size,
         .stop_label_font_size = stop_label_font_size,
         .underlayer_width = underlayer_width,
-        .bus_label_offset = ParsePoit(bus_label_offset),
-        .stop_label_offset = ParsePoit(stop_label_offset),
+        .bus_label_offset = ParsePoint(bus_label_offset),
+        .stop_label_offset = ParsePoint(stop_label_offset),
         .underlayer_color = ParseColor(underlayer_color),
         .color_palette = CreateColorPalette(color_palette)
     };

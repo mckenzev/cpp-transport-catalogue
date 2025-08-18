@@ -22,7 +22,11 @@ public:
 
 class Node final : private std::variant<std::nullptr_t, int, double, std::string, bool, Array, Dict> {
 public:
+    using Value = variant;
     using variant::variant;
+
+    Value& GetValue();
+    const Value& GetValue() const;
 
     int AsInt() const;
     bool AsBool() const;
