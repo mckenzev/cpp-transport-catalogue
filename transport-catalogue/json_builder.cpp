@@ -1,12 +1,14 @@
 #include "json_builder.h"
 
+#include <type_traits>
 
+using namespace std;
 namespace json {
 
 // При создании объекта Builder, указатель на корневой json объект попадает в стек, так как все методы работают с верхушкой стека
 // Если стек опустел, значит объект построен, можно вызывать Build()
 Builder::Builder()
-    : root_node_(), node_stack_({&root_node_}) {}
+    : root_node_(nullptr), node_stack_({&root_node_}) {}
     
 
 Builder::DictItemContext Builder::Key(std::string key) {
@@ -28,107 +30,91 @@ Builder::DictItemContext Builder::Key(std::string key) {
     // Пустой объект идет в стек, так как дальше придется модифицировать его (Value())
     node_stack_.push(&it->second);
 
-    return DictItemContext(this);
+    return BaseContext(*this);
 }
 
-Builder& Builder::Value(Node::Value val) {
-    // Метод работает с верхним объектом стека, а именно присваивает ему значение параметра `val`
-    // Если стек пуст, значит нечему передавать `val`
-    if (node_stack_.empty()) {
-        throw std::logic_error("Value() call is not allowed in current context");
-    }
 
-    // Если на верхушке стека массив, то просто пушим в него `val`
-    if (node_stack_.top()->IsArray()) {
-        auto& json_array = const_cast<Array&>(node_stack_.top()->AsArray());
-        // Node наследник Node::Value, имеет такой же размер и выравнивание. Т.к. нет конвертации из
-        // Node::Value в Node, приходится пользоваться реинтерпретацией
-        json_array.push_back(reinterpret_cast<Node&>(val));
-    } else { // В противном случае на верхушке указатель на пустой объект, которому надо присвоить значение `val`
-        Node::Value& json_object = node_stack_.top()->GetValue();
-        json_object = std::move(val);
-
-        // Так как пустой объект больше не является таковым, из стека его можно убрать
-        node_stack_.pop();
-    }
-    return *this;
+Builder::BaseContext Builder::Value(Node::Value val) {
+    bool is_container = false;
+    return AddObject(move(val), is_container);
 }
 
-Builder::DictContext Builder::StartDict() {
-    // Если стек пуст, то негде создавать словарь
+
+/**
+ * С оптимизацией -O3 и -O2 и флагом -Werror вылетают ошибки -Wmaybe-uninitialized]
+ * в этом месте *top = move(object);
+ * При этом с оптимизациями -O0 и -O1 все компилируется без проблем
+ * Возможно это ложные срабатывания предупреждений из-за чрезмерных оптимизаций
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
+Builder::BaseContext Builder::AddObject(Node::Value object, bool is_container) {
+    // Если стек пуст, то негде создавать новый объект
     if (node_stack_.empty()) {
         throw std::logic_error("Nested structure can only be started in array or dictionary context");
     }
 
-    // Словарь может быть создан поверх пустого объекта(перезаписав его) или как элемент массива
-    if (node_stack_.top()->IsArray()) {
-        // Так как на вершине стека находится Node, которая на самом деле Array, получаем ссылку на массив,
-        // убрав константность(у As* методов предусмотрен возврат только константных ссылок)
-        Array& json_array = const_cast<Array&>(node_stack_.top()->AsArray());
-        
-        // * При записи json_array.push_back(Dict()) с оптимизацией -O3 не компилируется по причине неинициализации Dict(), хотя с -O0 все проходит,
-        // поэтому сначала создаю дефолтный Dict в переменную, а после перезаписываю ее. Возможно оптимизатор сам оптимизирует это место раз так хочет что то оптимизировать
-        Node dict;
-        dict = Dict();
-        json_array.push_back(std::move(dict));
-        // Так как создался словарь, дальнейшая работа производится в контексте словаря
-        node_stack_.push(&json_array.back());
+    Node* top = node_stack_.top();
+    if (top->IsArray()) {
+        // Если на верхушке стека массив, снимаем константность и добавляем в него объект
+        Array& json_array = const_cast<Array&>(top->AsArray());
+        json_array.emplace_back(move(object));
+
+        // Если добавлен контейнер, выводим его на верхушку стека для дальнейшей работы
+        if (is_container) {
+            node_stack_.push(&json_array.back());
+        }
     } else {
-        Node::Value& json_object = node_stack_.top()->GetValue();
-        json_object = Dict();
+        // Если на верхушке стека не массив, то просто перезаписывает значение верхушки
+        *top = move(object);
+        if (!is_container) {
+            node_stack_.pop();
+        }
     }
     
-    return DictContext(this);
+    return BaseContext(*this);
 }
 
-Builder& Builder::EndDict() {
-    // Если стек пуст, то ни для какого словаря нет возможности закрыть скобку
+#pragma GCC diagnostic pop // #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
+
+
+template <typename ContainerType>
+Builder::BaseContext Builder::CloseBracket() {
+    // Если стек пуст, то ни для какого словаря/массива нет возможности закрыть скобку
     if (node_stack_.empty()) {
         throw std::logic_error("It is not possible to complete the creation of the dictionary because the dictionary has not been initialized");
     }
 
-    // Иначе если стек не пуст, на его вершине должен находиться указатель на словарь, для которого закрываем скобку
-    if (!node_stack_.top()->IsMap()) {
+    Node::Value& top_val = node_stack_.top()->GetValue();
+
+    if (!holds_alternative<ContainerType>(top_val)) {
         throw std::logic_error("An unpaired dictionary bracket has been detected");
     }
 
-    // Так как словарь корректно создан, работу продолжаем с объектом, в контексте которого существовал словарь, а его указатель удаляем
+    // После закрытия скобки удаляем контейнер с верхушки стека
     node_stack_.pop();
 
     return *this;
+}
+
+Builder::DictContext Builder::StartDict() {
+    bool is_container = true;
+    return AddObject(Dict(), is_container);
+}
+
+Builder::BaseContext Builder::EndDict() {
+    return CloseBracket<Dict>();
 }
 
 Builder::ArrayContext Builder::StartArray() {
-    // Логика аналогичная StartDict()
-    if (node_stack_.empty()) {
-        throw std::logic_error("Nested structure can only be started in array or dictionary context");
-    }
-
-    if (node_stack_.top()->IsArray()) {
-        auto& json_array = const_cast<Array&>(node_stack_.top()->AsArray());
-        json_array.push_back(Array());
-        node_stack_.push(&json_array.back());
-    } else {
-        Node::Value& json_object = node_stack_.top()->GetValue();
-        json_object = Array();
-    }
-    
-    return ArrayContext(this);
+    bool is_container = true;
+    return AddObject(Array(), is_container);
 }
 
-Builder& Builder::EndArray() {
-    // И тут логика аналогична EndDict()
-    if (node_stack_.empty()) {
-        throw std::logic_error("It is not possible to complete the creation of the array because the array has not been initialized");
-    }
-
-    if (!node_stack_.top()->IsArray()) {
-        throw std::logic_error("An unpaired array bracket has been detected");
-    }
-
-    node_stack_.pop();
-
-    return *this;
+Builder::BaseContext Builder::EndArray() {
+    return CloseBracket<Array>();
 }
 
 Node Builder::Build() {

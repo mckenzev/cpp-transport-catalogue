@@ -8,68 +8,88 @@ namespace json {
 
 class Builder {
 public:
+
+/**
+ * С оптимизацией -O3 и -O2 и флагом -Werror вылетают ошибки -Wmaybe-uninitialized]
+ * в этом месте "return BaseContext::Value(std::move(val));"
+ * При этом с оптимизациями -O0 и -O1 все компилируется без проблем
+ * Возможно это ложные срабатывания предупреждений из-за чрезмерных оптимизаций
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
     class DictItemContext;
     class DictContext;
     class ArrayContext;
 
     class BaseContext {
     public:
-        explicit BaseContext(Builder* ptr) : ptr_(ptr) {}
-    protected:
-        virtual ~BaseContext() = default;
-        Builder* ptr_;
-    };
+        BaseContext(Builder& builder) : builder_(builder) {}
+        Node Build() {
+            return builder_.Build();
+        }
 
-    class DictItemContext final : public BaseContext {
-    public:
-        using BaseContext::BaseContext;
+        DictItemContext Key(std::string key) {
+            return builder_.Key(std::move(key));
+        }
 
-        DictContext Value(Node::Value val) {
-            ptr_->Value(std::move(val));
-            return DictContext(ptr_);
+        BaseContext Value(Node::Value val) {
+            return builder_.Value(std::move(val));
         }
 
         DictContext StartDict() {
-            return ptr_->StartDict();
+            return builder_.StartDict();
         }
 
         ArrayContext StartArray() {
-            return ptr_->StartArray();
+            return builder_.StartArray();
+        }
+
+        BaseContext EndDict() {
+            return builder_.EndDict();
+        }
+
+        BaseContext EndArray() {
+            return builder_.EndArray();
+        }
+
+    private:
+        Builder& builder_;
+    };
+
+#pragma GCC diagnostic pop // #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
+
+    class DictItemContext final : public BaseContext {
+    public:
+        DictItemContext(BaseContext base) : BaseContext(base) {}
+        Node Build() = delete;
+        DictItemContext Key(std::string) = delete;
+        BaseContext EndDict() = delete;
+        BaseContext EndArray() = delete;
+        DictContext Value(Node::Value val) {
+            return BaseContext::Value(std::move(val));
         }
     };
 
     class DictContext final : public BaseContext {
     public:
-        using BaseContext::BaseContext;
-
-        DictItemContext Key(std::string key) {
-            return ptr_->Key(std::move(key));
-        }
-
-        Builder& EndDict() {
-            return ptr_->EndDict();
-        }
+        DictContext(BaseContext base) : BaseContext(base) {}
+        Node Build() = delete;
+        ArrayContext StartArray() = delete;
+        BaseContext EndArray() = delete;
+        BaseContext Value(Node::Value) = delete;
+        DictContext StartDict() = delete;
     };
 
     class ArrayContext final : public BaseContext {
      public:
-        using BaseContext::BaseContext;
-
-        ArrayContext& Value(Node::Value val) {
-            ptr_->Value(std::move(val));
-            return *this;
-        }
-
-        DictContext StartDict() {
-            return ptr_->StartDict();
-        }
-
-        ArrayContext StartArray() {
-            return ptr_->StartArray();
-        }
-
-        Builder& EndArray() {
-            return ptr_->EndArray();
+        ArrayContext(BaseContext base) : BaseContext(base) {}
+        Node Build() = delete;
+        DictItemContext Key(std::string) = delete;
+        BaseContext EndDict() = delete;
+        ArrayContext Value(Node::Value val) {
+            return BaseContext::Value(std::move(val));
         }
     };
 
@@ -77,16 +97,21 @@ public:
 public:
     Builder();
     DictItemContext Key(std::string key);
-    Builder& Value(Node::Value val);
+    BaseContext Value(Node::Value val);
     DictContext StartDict();
-    Builder& EndDict();
+    BaseContext EndDict();
     ArrayContext StartArray();
-    Builder& EndArray();
+    BaseContext EndArray();
     Node Build();
 
 private:
     Node root_node_;
     std::stack<Node*> node_stack_;
+
+    BaseContext AddObject(Node::Value container, bool is_container);
+
+    template <typename ContainerType>
+    BaseContext CloseBracket();
 };
 
 } // namespace json

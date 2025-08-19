@@ -5,14 +5,14 @@ TEST_TYPE_FLAG = -DTEST_TYPE=$(TEST_TYPE)
 DEBUG = -g
 STD20 = -std=c++20
 SOURCE = geo.cpp \
-		 transport_catalogue.cpp \
 		 domain.cpp \
-		 json_reader.cpp \
-		 json_builder.cpp \
-		 json.cpp \
+		 transport_catalogue.cpp \
+		 svg.cpp \
 		 map_renderer.cpp \
 		 request_handler.cpp \
-		 svg.cpp \
+		 json.cpp \
+		 json_builder.cpp \
+		 json_reader.cpp \
 		 main.cpp
 EXE = run.exe
 

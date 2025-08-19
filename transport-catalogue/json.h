@@ -25,6 +25,8 @@ public:
     using Value = variant;
     using variant::variant;
 
+    Node(Value val) : variant(std::move(val)) {}
+
     Value& GetValue();
     const Value& GetValue() const;
 
