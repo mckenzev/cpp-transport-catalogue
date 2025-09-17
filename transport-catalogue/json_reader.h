@@ -31,5 +31,7 @@ private:
     json::Node MakeStopResponse(int id, const std::string& name) const;
     json::Node MakeBusResponse(int id, const std::string& name) const;
     json::Node RenderMap(int id) const;
+    json::Node BuildRoute(const json::Dict& request_prop) const;
     domain::dto::RenderSettings GetRenderSettings() const;
+    domain::dto::RoutingSettings GetRoutingSettings() const;
 };

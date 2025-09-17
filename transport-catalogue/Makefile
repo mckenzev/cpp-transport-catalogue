@@ -1,12 +1,10 @@
 GXX = g++
 FLAGS = -Werror -Wextra -Wall -O3
-TEST_TYPE = uint8_t
-TEST_TYPE_FLAG = -DTEST_TYPE=$(TEST_TYPE)
-DEBUG = -g
 STD20 = -std=c++20
 SOURCE = geo.cpp \
 		 domain.cpp \
 		 transport_catalogue.cpp \
+		 transport_router.cpp \
 		 svg.cpp \
 		 map_renderer.cpp \
 		 request_handler.cpp \

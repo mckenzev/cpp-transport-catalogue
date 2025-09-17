@@ -8,6 +8,7 @@
 #include "geo.h"
 #include "map_renderer.h"
 #include "transport_catalogue.h"
+#include "transport_router.h"
 
 
 class RequestHandler {
@@ -24,8 +25,14 @@ public:
     void AddBus(std::string_view name, const std::vector<std::string_view>& route, bool is_roundtrip);
     void AddStop(std::string_view name, geo::Coordinates coord);
     void SetRoadDistance(std::string_view from, std::string_view to, int distance);
+
+    // Запросы на рендер карты
     void SetRenderSettings(domain::dto::RenderSettings&& settings);
     std::string RenderMap() const;
+
+    // Запросы на поиск маршрута
+    void RouterInitialization(domain::dto::RoutingSettings settings);
+    std::optional<domain::dto::RouteResponse> BuildRoute(std::string_view from, std::string_view to) const;
 
 private:
     /**
@@ -34,4 +41,5 @@ private:
 
     TransportCatalogue db_;
     renderer::MapRenderer renderer_;
+    std::optional<TransportRouter> router_; // Инициализируется при первом запросе на поиск маршрута
 };

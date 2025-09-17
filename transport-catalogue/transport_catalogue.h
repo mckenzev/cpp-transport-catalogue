@@ -41,7 +41,7 @@ public:
 	[[nodiscard]] std::optional<BusStat> GetBusInfo(string_view bus_id) const;
 
 	/**
-	 * Возвращает `nullopt` если остановка не найдена или неотсортированный вектор(в т.ч. пустой) с остановками
+	 * Возвращает `nullopt`, если остановка не найдена, или неотсортированный вектор(в т.ч. пустой) с остановками
 	 */
 	[[nodiscard]] std::optional<const BusesTable> GetStopStat(string_view stop_name) const;
 
@@ -58,7 +58,6 @@ public:
 	std::optional<int> GetGeographicalDistance(string_view from, string_view to) const;
 
 	const std::deque<Stop>& GetAllStops() const noexcept;
-
 	const std::deque<Bus>& GetAllBuses() const noexcept;
 
 private:

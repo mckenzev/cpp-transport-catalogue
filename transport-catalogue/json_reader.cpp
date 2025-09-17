@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 
 using namespace std;
 using namespace json;
@@ -23,6 +24,7 @@ void JsonReader::ParseBaseRequests() {
     ParseStops(stops_prop);
     SetRoadDistances(stops_prop);
     ParseBuses(buses_prop);
+    handler_.RouterInitialization(GetRoutingSettings());
 }
 
 void JsonReader::ParseStatRequests() {
@@ -45,6 +47,8 @@ void JsonReader::ParseStatRequests() {
             array.Value(MakeBusResponse(id, name).GetValue());
         } else if (type == "Map") {
             array.Value(RenderMap(id).GetValue());
+        } else if (type == "Route") {
+            array.Value(BuildRoute(request_prop).GetValue());
         } else {
             throw std::runtime_error("Unable type \""s + type + "\" in \"stat_requests\" on json");
         }
@@ -196,6 +200,61 @@ Node JsonReader::RenderMap(int id) const {
     .Build();
 }
 
+Node JsonReader::BuildRoute(const json::Dict& request_prop) const {
+    int id = request_prop.at("id").AsInt();
+    const string& from = request_prop.at("from").AsString();
+    const string& to = request_prop.at("to").AsString();
+    const auto& request = handler_.BuildRoute(from, to);
+    if (!request.has_value()) {
+        return Builder()
+            .StartDict()
+                .Key("request_id").Value(id)
+                .Key("error_message").Value("not found")
+            .EndDict()
+        .Build();
+    }
+    Builder builder;
+    
+    auto array = builder.StartArray();
+
+    for (const auto& route_item : request->items) {
+        std::visit([&array](auto&& item) {
+            using Type = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<Type, domain::dto::Waiting>) {
+                array.Value(Node(
+                    Builder()
+                        .StartDict()
+                            .Key("type").Value("Wait")
+                            .Key("time").Value(item.time)
+                            .Key("stop_name").Value(item.stop_name)
+                        .EndDict()
+                    .Build()
+                ).GetValue());
+            } else if constexpr (std::is_same_v<Type, domain::dto::Trip>){
+                array.Value(Node(
+                    Builder()
+                        .StartDict()
+                            .Key("type").Value("Bus")
+                            .Key("time").Value(item.time)
+                            .Key("span_count").Value(item.span_count)
+                            .Key("bus").Value(item.bus)
+                        .EndDict()
+                    .Build()
+                ).GetValue());
+            }
+        }, std::move(route_item));
+    }
+
+    Node items = array.EndArray().Build();
+    return Builder()
+        .StartDict()
+            .Key("request_id").Value(id)
+            .Key("total_time").Value(request->total_time)
+            .Key("items").Value(items.GetValue())
+        .EndDict()
+    .Build();
+}
+
 // Анонимное пространство имен для вспомогательных функций для парса
 namespace {
 
@@ -291,5 +350,17 @@ domain::dto::RenderSettings JsonReader::GetRenderSettings() const {
         .stop_label_offset = ParsePoint(stop_label_offset),
         .underlayer_color = ParseColor(underlayer_color),
         .color_palette = CreateColorPalette(color_palette)
+    };
+}
+
+domain::dto::RoutingSettings JsonReader::GetRoutingSettings() const {
+    const auto& all_requests = doc_.GetRoot().AsMap();
+    const auto& routing_settings = all_requests.at("routing_settings").AsMap();
+    double velocity = routing_settings.at("bus_velocity").AsDouble();
+    int wait_time = routing_settings.at("bus_wait_time").AsInt();
+
+    return {
+        .velocity = velocity,
+        .wait_time = wait_time
     };
 }

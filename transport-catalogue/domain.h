@@ -76,6 +76,30 @@ struct RenderSettings { // Настройки MapRenderer
     std::vector<Color>color_palette;
 };
 
+struct RoutingSettings {
+    double velocity;
+    int wait_time;
+};
+
+// Структуры для хранения ответа из TransportRouter, который пройдя через RequestHandler должен использоваться в JsonReader
+struct Waiting {
+    std::string stop_name;
+    int time;
+};
+
+struct Trip {
+    std::string bus;
+    double time;
+    int span_count;
+};
+
+using RouteItem  = std::variant<Waiting, Trip>;
+
+struct RouteResponse {
+    std::vector<RouteItem> items;
+    double total_time;
+};
+
 } // namespace dto
 
 } // namespace domain

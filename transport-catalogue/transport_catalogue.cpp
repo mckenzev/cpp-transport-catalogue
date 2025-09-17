@@ -25,8 +25,8 @@ void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>&
     Bus* bus_ptr = &all_buses_.back();
     buses_map_.emplace(bus_ptr->name, bus_ptr);
 
-    for (auto stop : bus_ptr->stops) {
-        stop_to_buses_[stop->name].insert(bus_ptr);
+    for (auto stop_ptr : bus_ptr->stops) {
+        stop_to_buses_[stop_ptr->name].insert(bus_ptr);
     }
 }
 

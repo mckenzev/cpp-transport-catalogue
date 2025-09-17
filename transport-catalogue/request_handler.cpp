@@ -62,3 +62,10 @@ string RequestHandler::RenderMap() const {
     return renderer_.RenderMap(valid_buses, valid_stops);
 }
 
+void RequestHandler::RouterInitialization(RoutingSettings settings) {
+    router_.emplace(db_, settings);
+}
+
+optional<RouteResponse> RequestHandler::BuildRoute(string_view from, string_view to) const {
+    return router_->GetRoute(from, to);
+}

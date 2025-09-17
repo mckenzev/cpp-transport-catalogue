@@ -31,8 +31,8 @@
 *.out
 *.app
 
-.vscode
 Makefile
+.vscode
 *.txt
 *.json
 *.svg
