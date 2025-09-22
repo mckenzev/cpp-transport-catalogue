@@ -55,17 +55,17 @@ Graph TransportRouter::GraphInitialization() const {
     for (const auto& bus : all_buses) {
         const vector<const Stop*>& bus_route = bus.stops;
         
-        AddEdgesInGraph(bus_route, graph, &bus);
+        AddEdgesInGraph(bus_route, graph, bus);
 
         if (!bus.is_roundtrip) {
-            AddEdgesInGraph({bus_route.rbegin(), bus_route.rend()}, graph, &bus);
+            AddEdgesInGraph({bus_route.rbegin(), bus_route.rend()}, graph, bus);
         }
     }
 
     return graph;
 }
 
-void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route, Graph& graph, const Bus* bus_ptr) const {
+void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route, Graph& graph, const Bus& bus) const {
     // Вектор префиксных сумм времени, потраченного на путь из начала до конца маршрута
     vector<Time> travel_times = CreateTravelTimesVector(stops_on_route);
 
@@ -86,7 +86,7 @@ void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route,
                 .wait_time = settings_.wait_time,
                 .span_count = span_count,
                 .start_stop = from_ptr,
-                .bus = bus_ptr
+                .bus = &bus
             };
 
             Edge<GraphData> edge{

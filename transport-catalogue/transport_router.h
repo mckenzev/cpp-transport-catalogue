@@ -69,7 +69,7 @@ private:
 
     std::unordered_map<const Stop*, graph::VertexId> VerticesIdInitialization() const;
     Graph GraphInitialization() const;
-    void AddEdgesInGraph(const std::vector<const Stop*>& stops_on_route, Graph& graph, const Bus* bus) const;
+    void AddEdgesInGraph(const std::vector<const Stop*>& stops_on_route, Graph& graph, const Bus& bus) const;
     std::vector<Time> CreateTravelTimesVector(const std::vector<const Stop*>& stops_on_route) const;
     double CalculateTime(double distance) const noexcept;
     int GetDistance(const Stop* from, const Stop* to) const;
