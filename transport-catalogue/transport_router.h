@@ -62,14 +62,14 @@ private:
     const std::deque<Stop>& all_stops_;
     std::unordered_map<const Stop*, graph::VertexId> vertices_id_;
     graph::DirectedWeightedGraph<GraphData> graph_;
-    graph::Router<GraphData> router_;
+    std::optional<graph::Router<GraphData>> router_;
 
     static constexpr double FACTOR_M_PER_MINUTE = 1000.0 / 60.0;
 
 
     std::unordered_map<const Stop*, graph::VertexId> VerticesIdInitialization() const;
-    Graph GraphInitialization() const;
-    void AddEdgesInGraph(const std::vector<const Stop*>& stops_on_route, Graph& graph, const Bus& bus) const;
+    void GraphInitialization();
+    void AddEdgesInGraph(const std::vector<const Stop*>& stops_on_route, const Bus& bus);
     std::vector<Time> CreateTravelTimesVector(const std::vector<const Stop*>& stops_on_route) const;
     double CalculateTime(double distance) const noexcept;
     int GetDistance(const Stop* from, const Stop* to) const;

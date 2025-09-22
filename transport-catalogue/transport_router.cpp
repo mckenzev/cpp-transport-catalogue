@@ -20,14 +20,17 @@ TransportRouter::TransportRouter(TransportCatalogue& db, domain::dto::RoutingSet
       settings_(settings),
       all_stops_(db_.GetAllStops()),
       vertices_id_(VerticesIdInitialization()),
-      graph_(GraphInitialization()),
-      router_(graph_) {}
+      graph_(all_stops_.size()) {
+        GraphInitialization();
+        // Роутер зависит от инициализации графа, поэтому инициализируется только после полной инициализации графа
+        router_.emplace(graph_);
+      }
 
 optional<RouteResponse> TransportRouter::GetRoute(string_view from, string_view to) const {
     VertexId from_id = vertices_id_.at(db_.FindStop(from));
     VertexId to_id = vertices_id_.at(db_.FindStop(to));
 
-    auto route = router_.BuildRoute(from_id, to_id);
+    auto route = router_->BuildRoute(from_id, to_id);
 
     if (!route.has_value()) {
         return std::nullopt;
@@ -47,25 +50,21 @@ std::unordered_map<const Stop*, VertexId> TransportRouter::VerticesIdInitializat
     return result;
 }
 
-Graph TransportRouter::GraphInitialization() const {
-    Graph graph(all_stops_.size());
-
+void TransportRouter::GraphInitialization() {
     const auto& all_buses = db_.GetAllBuses();
 
     for (const auto& bus : all_buses) {
         const vector<const Stop*>& bus_route = bus.stops;
         
-        AddEdgesInGraph(bus_route, graph, bus);
+        AddEdgesInGraph(bus_route, bus);
 
         if (!bus.is_roundtrip) {
-            AddEdgesInGraph({bus_route.rbegin(), bus_route.rend()}, graph, bus);
+            AddEdgesInGraph({bus_route.rbegin(), bus_route.rend()}, bus);
         }
     }
-
-    return graph;
 }
 
-void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route, Graph& graph, const Bus& bus) const {
+void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route, const Bus& bus) {
     // Вектор префиксных сумм времени, потраченного на путь из начала до конца маршрута
     vector<Time> travel_times = CreateTravelTimesVector(stops_on_route);
 
@@ -95,7 +94,7 @@ void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route,
                 .weight = std::move(data)
             };
             
-            graph.AddEdge(std::move(edge));
+            graph_.AddEdge(std::move(edge));
         }
     }
 }
