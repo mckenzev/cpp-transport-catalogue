@@ -14,7 +14,6 @@ using namespace std;
 using namespace graph;
 
 
-
 TransportRouter::TransportRouter(TransportCatalogue& db, domain::dto::RoutingSettings settings)
     : db_(db),
       settings_(settings),
@@ -39,7 +38,7 @@ optional<RouteResponse> TransportRouter::GetRoute(string_view from, string_view 
     return BuildRouteResponse(*route);
 }
 
-std::unordered_map<const Stop*, VertexId> TransportRouter::VerticesIdInitialization() const {
+unordered_map<const Stop*, VertexId> TransportRouter::VerticesIdInitialization() const {
     std::unordered_map<const Stop*, VertexId> result;
     result.reserve(all_stops_.size());
 
@@ -68,7 +67,7 @@ void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route,
     // Вектор префиксных сумм времени, потраченного на путь из начала до конца маршрута
     vector<Time> travel_times = CreateTravelTimesVector(stops_on_route);
 
-    // Добавлене всех отрезков пути в граф, где всего 1 ожидание и возможность проехать от 1-ой до всех остановок маршрута
+    // Добавление всех отрезков пути в граф, где всего 1 ожидание и возможность проехать от 1-ой до всех остановок маршрута
     for (int i = 0; i < static_cast<int>(stops_on_route.size()); ++i) {
         const Stop* from_ptr = stops_on_route[i];
         VertexId from_id = vertices_id_.at(from_ptr);
@@ -81,20 +80,20 @@ void TransportRouter::AddEdgesInGraph(const vector<const Stop*>& stops_on_route,
             int span_count = j - i;
 
             GraphData data {
+                .start_stop = from_ptr,
+                .bus = &bus,
                 .spans_time = time,
                 .wait_time = settings_.wait_time,
-                .span_count = span_count,
-                .start_stop = from_ptr,
-                .bus = &bus
+                .span_count = span_count
             };
-
+            
             Edge<GraphData> edge{
                 .from = from_id,
                 .to = to_id,
-                .weight = std::move(data)
+                .weight = data
             };
             
-            graph_.AddEdge(std::move(edge));
+            graph_.AddEdge(edge);
         }
     }
 }
@@ -124,7 +123,7 @@ vector<Time> TransportRouter::CreateTravelTimesVector(const vector<const Stop*>&
 
 double TransportRouter::CalculateTime(double distance) const noexcept {
     // velocity - дистанция в метрах, velocity преобразуется из км/ч в м/мин -> n мин
-    return distance / (settings_.velocity * FACTOR_M_PER_MINUTE);
+    return distance / (settings_.velocity * kMetersPerMinuteFactor);
 }
 
 

@@ -1,6 +1,5 @@
 #include "transport_catalogue.h"
 
-#include <stdexcept>
 
 using namespace std;
 using Bus = domain::Bus;
@@ -19,8 +18,9 @@ void TransportCatalogue::AddBus(string_view bus_name, const vector<string_view>&
         final_route.push_back(stop);
     }
     
-    Bus bus{string(bus_name), move(final_route), is_roundtrip};
-    all_buses_.push_back(move(bus));
+    // Bus bus{string(bus_name), move(final_route), is_roundtrip};
+    // all_buses_.push_back(move(bus));
+    all_buses_.emplace_back(string(bus_name), move(final_route), is_roundtrip);
 
     Bus* bus_ptr = &all_buses_.back();
     buses_map_.emplace(bus_ptr->name, bus_ptr);
@@ -34,8 +34,11 @@ void TransportCatalogue::AddStop(string_view stop_name, geo::Coordinates coord) 
     // Так как остановка может фигурировать как "соседняя" при создании другой ради указания географического маршрута,
     // эта "соседняя" остановка могла быть создана до ее официального создания через AddStop.
     // поэтому при официальном создании через AddStop проверяется, была ли создана остановка ранее или нет
-    Stop stop{string(stop_name), coord};
-    all_stops_.push_back(move(stop));
+    
+    // Stop stop{string(stop_name), coord};
+    // all_stops_.push_back(move(stop));
+
+    all_stops_.emplace_back(string(stop_name), coord);
     Stop* stop_ptr = &all_stops_.back();
     stops_map_.emplace(stop_ptr->name, stop_ptr);
 }
@@ -50,7 +53,7 @@ const Bus* TransportCatalogue::FindBus(string_view name) const {
     return it != buses_map_.end() ? it->second : nullptr;
 }
 
-optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const { // Подрефакторить
+optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const {
     const Bus* bus = FindBus(bus_id);
     
     if (bus == nullptr) {
@@ -72,8 +75,8 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const { // 
     uniq_stops.insert(stops.front());
 
     for (size_t i = 1; i < stops.size(); ++i) {
-        uniq_stops.insert(stops[i]);
         const Stop* current = stops[i];
+        uniq_stops.insert(current);
         // Для geo_distance проще напрямую вызывать ComputeDistance, чем GetGeographicalDistance,
         // т.к. в GetGeographicalDistance из sv опять придется получить указатель на Stop и лишь потом
         // получаются его координаты для рассчета растояния
@@ -90,7 +93,9 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const { // 
         prev = current;
     }
 
-    if (!bus->is_roundtrip) { // Рассчет расстояния в обратном направлении для некольцевого направления
+    // Рассчет расстояния в обратном направлении для некольцевого направления
+    // Опять приходится обходить все остановки, так как расстояние от A до B может быть не равно расстоянию от B до A
+    if (!bus->is_roundtrip) {
         for (size_t i = stops.size() - 1; i-- > 0;) {
             const Stop* current = stops[i];
             auto geo_distance = ComputeDistance(prev->coordinates, current->coordinates);
@@ -107,6 +112,7 @@ optional<BusStat> TransportCatalogue::GetBusInfo(string_view bus_id) const { // 
     }
 
     int stop_count = bus->is_roundtrip ? stops.size() : stops.size() * 2 - 1;
+
     return BusStat{
         .geo_distance = total_geo_distance,
         .stop_count = stop_count,

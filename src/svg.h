@@ -48,9 +48,7 @@ struct RenderContext {
     }
 
     void RenderIndent() const {
-        for (int i = 0; i < indent; ++i) {
-            out.put(' ');
-        }
+        out << std::string(indent, ' ');
     }
 
     std::ostream& out;
@@ -235,7 +233,6 @@ private:
 
 /*
  * Класс Circle моделирует элемент <circle> для отображения круга
- * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/circle
  */
 class Circle final : public Object, public PathProps<Circle> {
 public:
@@ -251,7 +248,6 @@ private:
 
 /*
  * Класс Polyline моделирует элемент <polyline> для отображения ломаных линий
- * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polyline
  */
 class Polyline final : public Object, public PathProps<Polyline> {
 public:
@@ -265,7 +261,6 @@ private:
 
 /*
  * Класс Text моделирует элемент <text> для отображения текста
- * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/text
  */
 class Text final : public Object, public PathProps<Text> {
 public:

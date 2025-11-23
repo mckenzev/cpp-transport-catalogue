@@ -6,6 +6,7 @@ using namespace std;
 using namespace geo;
 using namespace domain;
 using namespace domain::dto;
+
 using BusesTable = TransportCatalogue::BusesTable;
 
 
@@ -34,7 +35,7 @@ void RequestHandler::SetRenderSettings(RenderSettings&& settings) {
 }
 
 string RequestHandler::RenderMap() const {
-    auto& all_stops = db_.GetAllStops();
+    const auto& all_stops = db_.GetAllStops();
     vector<const Stop*> valid_stops;
     valid_stops.reserve(all_stops.size());
     for (auto& stop : all_stops) {
@@ -67,5 +68,9 @@ void RequestHandler::RouterInitialization(RoutingSettings settings) {
 }
 
 optional<RouteResponse> RequestHandler::BuildRoute(string_view from, string_view to) const {
+    if (!router_.has_value()) {
+        throw logic_error("Transport router is not initialized. Call RouterInitialization() first.");
+    }
+
     return router_->GetRoute(from, to);
 }

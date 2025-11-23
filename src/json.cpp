@@ -83,14 +83,14 @@ Node LoadDict(istream& input) {
             }
         }
 
-        string key = LoadNode(input).AsString(); // Ключ - строка. AsString кинет исключение если прочется не строка
+        string key = LoadNode(input).AsString(); // Ключ - строка. AsString кинет исключение если прочтется не строка
         
         input >> ws;
         if (!input.get(c) || c != ':') {
             throw ParsingError("Invalid dictionary format");
         }
 
-        // Если LoadNode попытается прочесть неверную ноду, она кинет исключение
+        // Если LoadNode попытается прочесть неверный json-объект, будет выброшено исключение
         result.emplace(move(key), LoadNode(input));
         wait_comma = true;
     }
@@ -99,7 +99,7 @@ Node LoadDict(istream& input) {
 }
 
 Node LoadNull(istream& input) {
-    constexpr std::string_view kNullStr = "null";
+    constexpr std::string_view kNullStr = "null"sv;
     for (char c : kNullStr) {
         if (input.get() != c) {
             throw ParsingError("Expected 'null'");
@@ -287,15 +287,13 @@ struct Node::PrintNode {
 
     void Print(const Array& array) const {
         out << "[\n";
-        // то, что находится в квадратных скобках, должно на 1 таб отступать от отступа блока массива
-        PrintOffset(offset + 1);
         bool wait_comma = false;
         for (const auto& item : array) {
             if (wait_comma) {
                 out << ",\n";
-                // Так как произошел перенос строки, отступ такой же, как при установке скобки
-                PrintOffset(offset + 1);
             }
+            
+            PrintOffset(offset + 1);
             // При принте следующих данных будет информация, что отступ отличается на 1 таб
             item.Print(out, offset + 1);
             wait_comma = true;
@@ -309,13 +307,13 @@ struct Node::PrintNode {
 
     void Print(const Dict& dict) const {
         out << "{\n";
-        PrintOffset(offset + 1);
         bool wait_comma = false;
         for (auto [key, value] : dict) {
             if (wait_comma) {
                 out << ",\n";
-                PrintOffset(offset + 1);
             }
+
+            PrintOffset(offset + 1);
             out << '"' << key << "\": ";
             value.Print(out, offset + 1);
             wait_comma = true;

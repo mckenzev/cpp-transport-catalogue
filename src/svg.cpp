@@ -54,7 +54,7 @@ void Polyline::RenderObject(const RenderContext& context) const {
         out << points_[i];
     }
 
-    out << '\"'; // Кавычка закрывающаяся перечисления точек
+    out << '\"'; // Кавычка закрывающая перечисление точек
 
     RenderAttrs(out);
 

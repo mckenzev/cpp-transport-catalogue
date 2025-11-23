@@ -15,9 +15,8 @@ JsonReader::JsonReader(istream& input, ostream& output)
 
 
 void JsonReader::ParseBaseRequests() {
-    Dict all_requests;
-    all_requests = doc_.GetRoot().AsMap();
-    auto& base_requests = all_requests.at("base_requests").AsArray();
+    const auto& all_requests = doc_.GetRoot().AsMap();
+    const auto& base_requests = all_requests.at("base_requests").AsArray();
     
     auto [stops_prop, buses_prop] = SplitRequests(base_requests);
 
@@ -118,7 +117,6 @@ void JsonReader::ParseBuses(const vector<Dict>& buses_prop) {
         string_view name = bus.at("name").AsString();
         const auto& stops = bus.at("stops").AsArray();
         
-        // пустой список остановок из-за гарантий задания не попадется, но все же такая проверка есть
         if (stops.empty()) {
             handler_.AddBus(name, {}, true);
             continue;
@@ -246,6 +244,7 @@ Node JsonReader::BuildRoute(const json::Dict& request_prop) const {
     }
 
     Node items = array.EndArray().Build();
+
     return Builder()
         .StartDict()
             .Key("request_id").Value(id)
@@ -255,7 +254,7 @@ Node JsonReader::BuildRoute(const json::Dict& request_prop) const {
     .Build();
 }
 
-// Анонимное пространство имен для вспомогательных функций для парса
+// Анонимное пространство имен для вспомогательных функций парсинга
 namespace {
 
 domain::dto::Color ParseColor(const Node& json_object) {
@@ -356,6 +355,7 @@ domain::dto::RenderSettings JsonReader::GetRenderSettings() const {
 domain::dto::RoutingSettings JsonReader::GetRoutingSettings() const {
     const auto& all_requests = doc_.GetRoot().AsMap();
     const auto& routing_settings = all_requests.at("routing_settings").AsMap();
+    
     double velocity = routing_settings.at("bus_velocity").AsDouble();
     int wait_time = routing_settings.at("bus_wait_time").AsInt();
 

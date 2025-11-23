@@ -15,7 +15,7 @@
 namespace graph {
 
 template <typename Weight>
-class Router {
+class  Router {
 private:
     using Graph = DirectedWeightedGraph<Weight>;
 

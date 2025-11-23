@@ -20,12 +20,12 @@ Builder::DictItemContext Builder::Key(std::string key) {
     // Т.к. AsMap возвращает константную ссылку, есть необходимость убрать константность, т.к. его надо модифицировать
     Dict& dict = const_cast<Dict&>(node_stack_.top()->AsMap());
 
-    if (dict.find(key) != dict.end()) {
+    // Новый ключ добавляется в словарь в паре с пустым объектом
+    auto [it, inserted] = dict.insert({key, Node()});
+
+    if (!inserted) {
         throw std::logic_error("Duplicate key");
     }
-
-    // Новый ключ добавляется в словарь в паре с пустым объектом
-    auto [it, flag] = dict.insert({key, Node()});
 
     // Пустой объект идет в стек, так как дальше придется модифицировать его (Value())
     node_stack_.push(&it->second);
@@ -35,15 +35,14 @@ Builder::DictItemContext Builder::Key(std::string key) {
 
 
 Builder::BaseContext Builder::Value(Node::Value val) {
-    bool is_container = false;
-    return AddObject(move(val), is_container);
+    return AddObject(move(val), /* is_container */ false);
 }
 
 
 /**
  * С оптимизацией -O3 и -O2 и флагом -Werror вылетают ошибки -Wmaybe-uninitialized]
  * в этом месте *top = move(object);
- * При этом с оптимизациями -O0 и -O1 все компилируется без проблем
+ * При этом с флагами оптимизаций -O0 и -O1 все компилируется без проблем
  * Возможно это ложные срабатывания предупреждений из-за чрезмерных оптимизаций
  */
 #pragma GCC diagnostic push
@@ -100,8 +99,7 @@ Builder::BaseContext Builder::CloseBracket() {
 }
 
 Builder::DictContext Builder::StartDict() {
-    bool is_container = true;
-    return AddObject(Dict(), is_container);
+    return AddObject(Dict(), /* is_container */ true);
 }
 
 Builder::BaseContext Builder::EndDict() {
@@ -109,8 +107,7 @@ Builder::BaseContext Builder::EndDict() {
 }
 
 Builder::ArrayContext Builder::StartArray() {
-    bool is_container = true;
-    return AddObject(Array(), is_container);
+    return AddObject(Array(), /* is_container */ true);
 }
 
 Builder::BaseContext Builder::EndArray() {

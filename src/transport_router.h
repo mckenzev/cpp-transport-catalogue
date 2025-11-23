@@ -12,7 +12,7 @@
 
 class TransportRouter {
 public:
-// Алиасы простарств имен
+
 using Bus = domain::Bus;
 using Stop = domain::Stop;
 using RouteResponse = domain::dto::RouteResponse;
@@ -24,11 +24,11 @@ using Time = double;
 
 // Структура для веса граней графа поможет хранить информацию о пройденных остановках и затраченного на это времени
 struct GraphData {
-    Time spans_time;
-    int wait_time;          // Из условия задачи ожидание целое число + int легче double
-    int span_count;
     const Stop* start_stop; // Фактически от этих указателей нужна строка, но 16 байт на 2 указателя легче, чем 32 на 2 string_view
     const Bus* bus;
+    Time spans_time;
+    int wait_time;          // Из условия задачи "ожидание" - целое число, к тому же int легче double
+    int span_count;
 
 
     constexpr bool operator<(const GraphData& rhs) const noexcept {
@@ -41,11 +41,11 @@ struct GraphData {
 
     GraphData operator+(const GraphData& rhs) const noexcept {
         return {
+            .start_stop = nullptr,                      // В контексте суммирования объектов start_stop и bus
+            .bus = nullptr,                             // не несут никакую смысловую нагрузку и их лучше занулить
             .spans_time = spans_time + rhs.spans_time,
             .wait_time = wait_time + rhs.wait_time,
-            .span_count = span_count + rhs.span_count,
-            .start_stop = nullptr,                      // В контексте суммирования объектов start_stop и bus
-            .bus = nullptr                              // не несут никакую смысловую нагрузку и их лучше занулить
+            .span_count = span_count + rhs.span_count
         };
     }
 };
@@ -64,7 +64,7 @@ private:
     graph::DirectedWeightedGraph<GraphData> graph_;
     std::optional<graph::Router<GraphData>> router_;
 
-    static constexpr double FACTOR_M_PER_MINUTE = 1000.0 / 60.0;
+    static constexpr double kMetersPerMinuteFactor = 1000.0 / 60.0;
 
 
     std::unordered_map<const Stop*, graph::VertexId> VerticesIdInitialization() const;
